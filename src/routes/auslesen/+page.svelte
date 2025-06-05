@@ -1,664 +1,294 @@
 <script>
-    import { onMount } from 'svelte';
-    
-    let fileInput;
-    let dragActive = false;
-    let invoiceData = null;
-    let error = null;
-    let loading = false;
-    let showRawXml = false;
-    
-    // Sample invoice data for demonstration
-    const sampleData = {
-      sender: {
-        name: 'Beispiel GmbH',
-        street: 'Musterstraße 123',
-        zip: '12345',
-        city: 'Musterstadt',
-        taxId: '12/345/67890'
-      },
-      recipient: {
-        name: 'Kunde AG',
-        street: 'Kundenweg 456',
-        zip: '54321',
-        city: 'Kundenstadt'
-      },
-      metadata: {
-        invoiceNumber: '2025-001',
-        date: '2025-01-15',
-        total: '1190.00',
-        currency: 'EUR'
-      },
-      items: [
-        {
-          description: 'Beratungsleistung',
-          quantity: 10,
-          unit: 'Stunden',
-          unitPrice: 100,
-          taxRate: 19
-        }
-      ]
-    };
-    
-    function handleFileSelect(event) {
-      const file = event.target.files?.[0] || event.dataTransfer?.files?.[0];
-      if (file) {
-        processFile(file);
+  import { parseInvoiceXml } from '$lib/utils/xml-parser.js';
+  import { onMount } from 'svelte';
+
+  let fileInput;
+  let dragActive = false;
+  let invoiceData = null;
+  let error = null;
+  let loading = false;
+  let showRawXml = false;
+
+  async function processFile(file) {
+      if (!file || !file.name.toLowerCase().endsWith('.xml')) {
+          error = 'Fehler: Bitte eine gültige XML-Datei hochladen.';
+          return;
       }
-    }
-    
-    function handleDrop(event) {
+
+      loading = true;
+      error = null;
+      invoiceData = null;
+
+      try {
+          const xmlString = await file.text();
+          const parsedData = await parseInvoiceXml(xmlString);
+          
+          invoiceData = {
+              ...parsedData,
+              fileName: file.name,
+              fileSize: (file.size / 1024).toFixed(2) + ' KB',
+              uploadDate: new Date()
+          };
+
+      } catch (err) {
+          error = err.message;
+          console.error(err);
+      } finally {
+          loading = false;
+      }
+  }
+
+  function handleFileSelect(event) {
+      const file = event.target.files?.[0];
+      processFile(file);
+  }
+  
+  function handleDrop(event) {
       event.preventDefault();
       dragActive = false;
       const file = event.dataTransfer.files[0];
-      if (file) {
-        processFile(file);
-      }
-    }
-    
-    function handleDragOver(event) {
-      event.preventDefault();
-      dragActive = true;
-    }
-    
-    function handleDragLeave(event) {
-      event.preventDefault();
-      dragActive = false;
-    }
-    
-    async function processFile(file) {
-      if (!file.name.endsWith('.xml')) {
-        error = 'Bitte laden Sie eine XML-Datei hoch.';
-        return;
-      }
-      
-      loading = true;
-      error = null;
-      
-      try {
-        const text = await file.text();
-        // For demo purposes, we'll use sample data
-        // In production, you would parse the XML here
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing
-        
-        invoiceData = {
-          ...sampleData,
-          rawXml: text,
-          fileName: file.name,
-          fileSize: (file.size / 1024).toFixed(2) + ' KB',
-          uploadDate: new Date().toLocaleDateString('de-DE')
-        };
-      } catch (err) {
-        error = 'Fehler beim Lesen der Datei: ' + err.message;
-      } finally {
-        loading = false;
-      }
-    }
-    
-    function resetUpload() {
+      processFile(file);
+  }
+
+  function reset() {
       invoiceData = null;
       error = null;
       if (fileInput) fileInput.value = '';
-    }
-    
-    function downloadReport() {
-      // Create a simple text report
-      const report = generateTextReport(invoiceData);
-      const blob = new Blob([report], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Prüfbericht_${invoiceData.metadata.invoiceNumber}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-    
-    function generateTextReport(data) {
-      return `E-RECHNUNGSPRÜFBERICHT
-  =====================
-  
-  Dateiinformationen:
-  - Dateiname: ${data.fileName}
-  - Dateigröße: ${data.fileSize}
-  - Prüfdatum: ${data.uploadDate}
-  
-  Rechnungsdaten:
-  - Rechnungsnummer: ${data.metadata.invoiceNumber}
-  - Rechnungsdatum: ${data.metadata.date}
-  - Gesamtbetrag: ${data.metadata.total} ${data.metadata.currency}
-  
-  Absender:
-  - Name: ${data.sender.name}
-  - Adresse: ${data.sender.street}, ${data.sender.zip} ${data.sender.city}
-  - Steuernummer: ${data.sender.taxId}
-  
-  Empfänger:
-  - Name: ${data.recipient.name}
-  - Adresse: ${data.recipient.street}, ${data.recipient.zip} ${data.recipient.city}
-  
-  Validierung:
-  ✓ XML-Struktur gültig
-  ✓ Pflichtfelder vorhanden
-  ✓ Schema-konform
-  
-  Dieser Bericht wurde erstellt mit kostenlose-erechnung.de`;
-    }
-  </script>
-  
-  <div class="reader-container">
-    <div class="container">
-      <div class="reader-header">
-        <h1>E-Rechnung prüfen</h1>
-        <p>Laden Sie eine XRechnung oder ZUGFeRD-Datei hoch, um deren Inhalt zu prüfen und anzuzeigen</p>
-      </div>
-      
-      {#if !invoiceData}
-        <div class="upload-section">
-          <div 
-          aria-roledescription="Drag and drop your XML file here"
-            class="upload-area"
-            class:drag-active={dragActive}
-            on:drop={handleDrop}
-            on:dragover={handleDragOver}
-            on:dragleave={handleDragLeave}
-          >
-            <div class="upload-icon">📤</div>
-            <h3>XML-Datei hier ablegen</h3>
-            <p>oder</p>
-            <button 
-              class="btn btn-primary"
+  }
+
+  function formatCurrency(amount, currency = "EUR") {
+      return new Intl.NumberFormat("de-DE", {
+          style: "currency",
+          currency: currency
+      }).format(amount || 0);
+  }
+
+  function formatDate(date) {
+      if (!date) return 'N/A';
+      return new Date(date).toLocaleDateString('de-DE', {
+          day: '2-digit', month: '2-digit', year: 'numeric'
+      });
+  }
+
+</script>
+
+<svelte:head>
+  <title>E-Rechnung online prüfen | XRechnung & ZUGFeRD Viewer</title>
+  <meta name="description" content="Kostenloses Online-Tool zur Validierung und Anzeige von elektronischen Rechnungen im XRechnung- und ZUGFeRD-XML-Format. Sicher, privat und direkt im Browser." />
+</svelte:head>
+
+<div class="container">
+  <header class="page-header">
+      <h1>E-Rechnungs-Prüfer</h1>
+      <p>Laden Sie eine XRechnung oder ZUGFeRD XML-Datei hoch, um sie zu validieren und anzuzeigen.</p>
+  </header>
+
+  {#if !invoiceData}
+      <section id="upload-section">
+          <div
+              class="drop-zone"
+              class:drag-active={dragActive}
+              on:dragenter={() => dragActive = true}
+              on:dragleave={() => dragActive = false}
+              on:dragover|preventDefault
+              on:drop|preventDefault={handleDrop}
               on:click={() => fileInput.click()}
-              disabled={loading}
-            >
-              Datei auswählen
-            </button>
-            <input
-              bind:this={fileInput}
-              type="file"
-              accept=".xml"
-              on:change={handleFileSelect}
-              style="display: none;"
-            />
-            <p class="upload-info">Unterstützte Formate: XRechnung, ZUGFeRD (XML)</p>
+              role="button"
+              tabindex="0"
+          >
+              <div class="icon">📤</div>
+              <h3>Datei hier ablegen oder klicken</h3>
+              <p>Unterstützte Formate: .xml (XRechnung, ZUGFeRD)</p>
+              <input
+                  bind:this={fileInput}
+                  type="file"
+                  accept=".xml"
+                  on:change={handleFileSelect}
+                  hidden
+              />
           </div>
-          
+
           {#if loading}
-            <div class="loading">
-              <div class="spinner"></div>
-              <p>Datei wird analysiert...</p>
-            </div>
+              <div class="status-box loading">
+                  <div class="spinner"></div>
+                  <span>Analysiere Datei...</span>
+              </div>
           {/if}
-          
+
           {#if error}
-            <div class="error-message">
-              <span class="error-icon">⚠️</span>
-              {error}
-            </div>
+              <div class="status-box error">
+                  <span>⚠️</span>
+                  <p>{error}</p>
+              </div>
           {/if}
-          
-          <div class="info-cards">
-            <div class="info-card">
-              <h4>🔒 Sicher & Privat</h4>
-              <p>Ihre Daten werden nur lokal in Ihrem Browser verarbeitet und nicht auf unseren Servern gespeichert.</p>
-            </div>
-            <div class="info-card">
-              <h4>✓ Validierung</h4>
-              <p>Wir prüfen die technische Gültigkeit und zeigen alle wichtigen Rechnungsinformationen übersichtlich an.</p>
-            </div>
-            <div class="info-card">
-              <h4>📊 Detailansicht</h4>
-              <p>Erhalten Sie eine klare Übersicht über Absender, Empfänger, Positionen und Beträge.</p>
-            </div>
-          </div>
-        </div>
-      {:else}
-        <div class="result-section">
-          <div class="result-header">
-            <div class="result-title">
-              <h2>Rechnungsanalyse</h2>
-              <div class="file-info">
-                <span class="file-name">{invoiceData.fileName}</span>
-                <span class="file-size">{invoiceData.fileSize}</span>
+
+          <div class="info-grid">
+              <div class="info-card">
+                  <h4>🔒 Sicher & Privat</h4>
+                  <p>Ihre Daten werden nur lokal in Ihrem Browser verarbeitet. Nichts wird hochgeladen.</p>
               </div>
-            </div>
-            <div class="result-actions">
-              <button class="btn btn-secondary" on:click={resetUpload}>
-                Neue Datei prüfen
-              </button>
-              <button class="btn btn-primary" on:click={downloadReport}>
-                📥 Prüfbericht
-              </button>
-            </div>
-          </div>
-          
-          <div class="validation-status">
-            <div class="status-item success">
-              <span class="status-icon">✓</span>
-              <span>XML-Struktur gültig</span>
-            </div>
-            <div class="status-item success">
-              <span class="status-icon">✓</span>
-              <span>Schema-konform</span>
-            </div>
-            <div class="status-item success">
-              <span class="status-icon">✓</span>
-              <span>Pflichtfelder vorhanden</span>
-            </div>
-          </div>
-          
-          <div class="data-view">
-            <div class="view-toggle">
-              <button 
-                class:active={!showRawXml}
-                on:click={() => showRawXml = false}
-              >
-                Strukturierte Ansicht
-              </button>
-              <button 
-                class:active={showRawXml}
-                on:click={() => showRawXml = true}
-              >
-                XML-Ansicht
-              </button>
-            </div>
-            
-            {#if !showRawXml}
-              <div class="structured-data">
-                <div class="data-section">
-                  <h3>Rechnungskopf</h3>
-                  <div class="data-grid">
-                    <div class="data-item">
-                      <span class="label">Rechnungsnummer:</span>
-                      <span class="value">{invoiceData.metadata.invoiceNumber}</span>
-                    </div>
-                    <div class="data-item">
-                      <span class="label">Rechnungsdatum:</span>
-                      <span class="value">{invoiceData.metadata.date}</span>
-                    </div>
-                    <div class="data-item">
-                      <span class="label">Gesamtbetrag:</span>
-                      <span class="value highlight">{invoiceData.metadata.total} {invoiceData.metadata.currency}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="parties-grid">
-                  <div class="data-section">
-                    <h3>Rechnungssteller</h3>
-                    <div class="party-info">
-                      <strong>{invoiceData.sender.name}</strong>
-                      <p>{invoiceData.sender.street}</p>
-                      <p>{invoiceData.sender.zip} {invoiceData.sender.city}</p>
-                      {#if invoiceData.sender.taxId}
-                        <p class="tax-info">Steuernummer: {invoiceData.sender.taxId}</p>
-                      {/if}
-                    </div>
-                  </div>
-                  
-                  <div class="data-section">
-                    <h3>Rechnungsempfänger</h3>
-                    <div class="party-info">
-                      <strong>{invoiceData.recipient.name}</strong>
-                      <p>{invoiceData.recipient.street}</p>
-                      <p>{invoiceData.recipient.zip} {invoiceData.recipient.city}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="data-section">
-                  <h3>Rechnungspositionen</h3>
-                  <table class="positions-table">
-                    <thead>
-                      <tr>
-                        <th>Beschreibung</th>
-                        <th>Menge</th>
-                        <th>Einheit</th>
-                        <th>Einzelpreis</th>
-                        <th>MwSt.</th>
-                        <th>Gesamt</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each invoiceData.items as item}
-                        <tr>
-                          <td>{item.description}</td>
-                          <td class="number">{item.quantity}</td>
-                          <td>{item.unit}</td>
-                          <td class="number">{item.unitPrice.toFixed(2)} €</td>
-                          <td class="number">{item.taxRate}%</td>
-                          <td class="number">{(item.quantity * item.unitPrice).toFixed(2)} €</td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
+              <div class="info-card">
+                  <h4>✓ Umfassende Prüfung</h4>
+                  <p>Technische Gültigkeit und alle wichtigen Rechnungsinformationen übersichtlich dargestellt.</p>
               </div>
-            {:else}
+              <div class="info-card">
+                  <h4>📊 Alle Standards</h4>
+                  <p>Unterstützt ZUGFeRD (alle Profile) und XRechnung (UBL & CII Syntax).</p>
+              </div>
+          </div>
+      </section>
+  {:else}
+      <section id="result-section">
+          <header class="result-header">
+              <div>
+                  <h2>Rechnungsdetails</h2>
+                  <span class="profile-badge">{invoiceData.profile} ({invoiceData.syntax})</span>
+              </div>
+              <div class="actions">
+                  <button class="btn-secondary" on:click={() => showRawXml = !showRawXml}>
+                      {showRawXml ? 'Strukturierte Ansicht' : 'XML anzeigen'}
+                  </button>
+                  <button class="btn-primary" on:click={reset}>Neue Prüfung</button>
+              </div>
+          </header>
+
+          {#if showRawXml}
               <div class="xml-view">
-                <pre><code>{invoiceData.rawXml || '<?xml version="1.0" encoding="UTF-8"?>\n<!-- XML-Inhalt wird hier angezeigt -->'}</code></pre>
+                  <pre><code>{invoiceData.rawXml}</code></pre>
               </div>
-            {/if}
-          </div>
-        </div>
-      {/if}
-    </div>
-  </div>
+          {:else}
+              <div class="invoice-details">
+                  <div class="card">
+                      <h3>Übersicht</h3>
+                      <div class="grid-3">
+                          <div><label>Rechnungsnummer</label><strong>{invoiceData.metadata.invoiceNumber}</strong></div>
+                          <div><label>Rechnungsdatum</label><strong>{formatDate(invoiceData.metadata.date)}</strong></div>
+                          <div><label>Fälligkeitsdatum</label><strong>{formatDate(invoiceData.metadata.dueDate)}</strong></div>
+                      </div>
+                  </div>
+
+                  <div class="grid-2">
+                      <div class="card">
+                          <h3>Rechnungssteller</h3>
+                          <p><strong>{invoiceData.sender.name}</strong></p>
+                          <p>{invoiceData.sender.street}</p>
+                          <p>{invoiceData.sender.zip} {invoiceData.sender.city}</p>
+                          <p>{invoiceData.sender.country}</p>
+                          {#if invoiceData.sender.ustId}<p><small>USt-IdNr.: {invoiceData.sender.ustId}</small></p>{/if}
+                      </div>
+                      <div class="card">
+                          <h3>Rechnungsempfänger</h3>
+                          <p><strong>{invoiceData.recipient.name}</strong></p>
+                          <p>{invoiceData.recipient.street}</p>
+                          <p>{invoiceData.recipient.zip} {invoiceData.recipient.city}</p>
+                          <p>{invoiceData.recipient.country}</p>
+                           {#if invoiceData.recipient.contact?.name}<p><small>z.H. {invoiceData.recipient.contact.name}</small></p>{/if}
+                      </div>
+                  </div>
+
+                  <div class="card">
+                      <h3>Positionen</h3>
+                      <table class="items-table">
+                          <thead>
+                              <tr>
+                                  <th>#</th>
+                                  <th>Beschreibung</th>
+                                  <th class="text-right">Menge</th>
+                                  <th class="text-right">Einzelpreis</th>
+                                  <th class="text-right">MwSt.</th>
+                                  <th class="text-right">Gesamt (Netto)</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {#each invoiceData.items as item, i}
+                                  <tr>
+                                      <td>{item.id || i + 1}</td>
+                                      <td>{item.description}</td>
+                                      <td class="text-right">{item.quantity} {item.unit}</td>
+                                      <td class="text-right">{formatCurrency(item.unitPrice, invoiceData.metadata.currency)}</td>
+                                      <td class="text-right">{item.taxRate}%</td>
+                                      <td class="text-right">{formatCurrency(item.lineTotal, invoiceData.metadata.currency)}</td>
+                                  </tr>
+                              {/each}
+                          </tbody>
+                      </table>
+                  </div>
+
+                  <div class="card totals-card">
+                      <h3>Gesamtbeträge</h3>
+                      <div class="totals-grid">
+                          <div><label>Nettobetrag</label><span>{formatCurrency(invoiceData.totals.netTotal, invoiceData.metadata.currency)}</span></div>
+                          <div><label>Umsatzsteuer</label><span>{formatCurrency(invoiceData.totals.taxTotal, invoiceData.metadata.currency)}</span></div>
+                          <div class="highlight"><label>Bruttobetrag</label><span>{formatCurrency(invoiceData.totals.grossTotal, invoiceData.metadata.currency)}</span></div>
+                          <div class="highlight payable"><label>Zahlbetrag</label><span>{formatCurrency(invoiceData.totals.payableAmount, invoiceData.metadata.currency)}</span></div>
+                      </div>
+                  </div>
+              </div>
+          {/if}
+      </section>
+  {/if}
+</div>
+
+<style>
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+  .page-header { text-align: center; margin-bottom: 2rem; }
+  .page-header h1 { font-size: 2.5rem; color: var(--text-dark); }
+  .page-header p { font-size: 1.2rem; color: var(--text-light); }
   
-  <style>
-    .reader-container {
-      min-height: calc(100vh - 80px);
-      padding: 3rem 0;
-      background: var(--bg-light);
-    }
+  /* Upload Section */
+  .drop-zone { border: 2px dashed var(--border-color); border-radius: var(--radius); padding: 3rem; text-align: center; transition: all 0.2s ease; cursor: pointer; background: var(--bg-white); }
+  .drop-zone:hover, .drop-zone.drag-active { border-color: var(--primary-color); background: #e9f5ff; }
+  .drop-zone .icon { font-size: 3rem; }
+
+  .status-box { margin-top: 1.5rem; padding: 1rem; border-radius: var(--radius); display: flex; align-items: center; gap: 1rem; }
+  .status-box.loading { background-color: #e9f5ff; color: #004085; }
+  .status-box.error { background-color: #f8d7da; color: #721c24; }
+  .spinner { width: 24px; height: 24px; border: 3px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
+  .info-card { background: var(--bg-white); padding: 1.5rem; border-radius: var(--radius); text-align: center; border: 1px solid var(--border-color); }
+
+  /* Result Section */
+  .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+  .result-header h2 { margin: 0; }
+  .profile-badge { background-color: #e2e3e5; color: #343a40; padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: var(--radius); font-weight: 600; }
+  .actions { display: flex; gap: 1rem; }
+  .btn-primary, .btn-secondary { padding: 0.6rem 1.2rem; border: 1px solid; border-radius: var(--radius); font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+  .btn-primary { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+ 
+  .btn-secondary { background-color: var(--bg-white); color: var(--text-dark); border-color: var(--border-color); }
+  .btn-secondary:hover { background-color: var(--bg-light); }
+
+  .xml-view { background: #282c34; color: #abb2bf; padding: 1.5rem; border-radius: var(--radius); overflow-x: auto; }
+  .xml-view pre { margin: 0; font-size: 0.9rem; }
   
-    .reader-header {
-      text-align: center;
-      margin-bottom: 3rem;
-    }
+  .invoice-details { display: flex; flex-direction: column; gap: 1.5rem; }
+  .card { background: var(--bg-white); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1.5rem; }
+  .card h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+
+  .grid-2 > .card, .grid-3 > .card { width: 100%; }
+  .card label { display: block; font-size: 0.9rem; color: var(--text-light); margin-bottom: 0.25rem; }
+  .card strong { font-size: 1rem; color: var(--text-dark); }
+  .card p { margin: 0 0 0.5rem; }
   
-    .reader-header h1 {
-      margin-bottom: 0.5rem;
-    }
+  .items-table { width: 100%; border-collapse: collapse; }
+  .items-table th, .items-table td { padding: 0.75rem; border-bottom: 1px solid var(--border-color); text-align: left; }
+  .items-table thead { background-color: var(--bg-light); }
+  .text-right { text-align: right; }
+
+  .totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 2rem; }
+  .totals-grid div { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); }
+  .totals-grid div.highlight { font-size: 1.1rem; font-weight: bold; }
+  .totals-grid div.payable { font-size: 1.3rem; color: var(--primary-color); }
+  .totals-grid div:last-child { border-bottom: none; }
+  .totals-grid label { color: var(--text-light); }
   
-    .reader-header p {
-      font-size: 1.25rem;
-      color: var(--text-light);
-    }
-  
-    .upload-section {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-  
-    .upload-area {
-      background: var(--bg-white);
-      border: 3px dashed var(--border-color);
-      border-radius: var(--radius-lg);
-      padding: 4rem 2rem;
-      text-align: center;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-  
-    .upload-area.drag-active {
-      border-color: var(--primary-color);
-      background: var(--primary-light);
-    }
-  
-    .upload-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-    }
-  
-    .upload-area h3 {
-      margin-bottom: 1rem;
-    }
-  
-    .upload-area p {
-      color: var(--text-light);
-      margin: 1rem 0;
-    }
-  
-    .upload-info {
-      font-size: 0.875rem;
-      margin-top: 2rem;
-    }
-  
-    .loading {
-      text-align: center;
-      padding: 2rem;
-    }
-  
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid var(--border-color);
-      border-top-color: var(--primary-color);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 1rem;
-    }
-  
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  
-    .error-message {
-      background: #fee;
-      color: #c33;
-      padding: 1rem;
-      border-radius: var(--radius);
-      margin: 1rem 0;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-  
-    .info-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-top: 3rem;
-    }
-  
-    .info-card {
-      background: var(--bg-white);
-      padding: 2rem;
-      border-radius: var(--radius);
-      text-align: center;
-    }
-  
-    .info-card h4 {
-      margin-bottom: 0.5rem;
-    }
-  
-    .info-card p {
-      color: var(--text-light);
-      margin: 0;
-    }
-  
-    .result-section {
-      background: var(--bg-white);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
-      box-shadow: var(--shadow);
-    }
-  
-    .result-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-  
-    .result-title h2 {
-      margin: 0;
-    }
-  
-    .file-info {
-      display: flex;
-      gap: 1rem;
-      margin-top: 0.5rem;
-      font-size: 0.875rem;
-      color: var(--text-light);
-    }
-  
-    .result-actions {
-      display: flex;
-      gap: 1rem;
-    }
-  
-    .validation-status {
-      display: flex;
-      gap: 2rem;
-      margin-bottom: 2rem;
-      padding: 1rem;
-      background: var(--bg-light);
-      border-radius: var(--radius);
-      flex-wrap: wrap;
-    }
-  
-    .status-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-  
-    .status-item.success {
-      color: #27ae60;
-    }
-  
-    .status-icon {
-      font-size: 1.25rem;
-    }
-  
-    .view-toggle {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 2rem;
-    }
-  
-    .view-toggle button {
-      padding: 0.5rem 1.5rem;
-      border: 1px solid var(--border-color);
-      background: var(--bg-white);
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-  
-    .view-toggle button:first-child {
-      border-radius: var(--radius) 0 0 var(--radius);
-    }
-  
-    .view-toggle button:last-child {
-      border-radius: 0 var(--radius) var(--radius) 0;
-      border-left: none;
-    }
-  
-    .view-toggle button.active {
-      background: var(--primary-color);
-      color: var(--text-dark);
-      border-color: var(--primary-color);
-    }
-  
-    .data-section {
-      background: var(--bg-light);
-      padding: 1.5rem;
-      border-radius: var(--radius);
-      margin-bottom: 1.5rem;
-    }
-  
-    .data-section h3 {
-      font-size: 1.125rem;
-      margin-bottom: 1rem;
-    }
-  
-    .data-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1rem;
-    }
-  
-    .data-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-  
-    .data-item .label {
-      font-size: 0.875rem;
-      color: var(--text-light);
-    }
-  
-    .data-item .value {
-      font-weight: 600;
-    }
-  
-    .data-item .value.highlight {
-      color: var(--primary-dark);
-      font-size: 1.25rem;
-    }
-  
-    .parties-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-    }
-  
-    .party-info p {
-      margin: 0.25rem 0;
-    }
-  
-    .tax-info {
-      font-size: 0.875rem;
-      color: var(--text-light);
-      margin-top: 0.5rem;
-    }
-  
-    .positions-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-  
-    .positions-table th {
-      background: var(--bg-white);
-      padding: 0.75rem;
-      text-align: left;
-      font-weight: 600;
-      border-bottom: 2px solid var(--border-color);
-    }
-  
-    .positions-table td {
-      padding: 0.75rem;
-      border-bottom: 1px solid var(--border-color);
-    }
-  
-    .positions-table .number {
-      text-align: right;
-    }
-  
-    .xml-view {
-      background: #f8f9fa;
-      padding: 1.5rem;
-      border-radius: var(--radius);
-      overflow-x: auto;
-    }
-  
-    .xml-view pre {
-      margin: 0;
-      font-family: 'Courier New', monospace;
-      font-size: 0.875rem;
-      line-height: 1.5;
-    }
-  
-    @media (max-width: 768px) {
-      .result-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-  
-      .result-actions {
-        width: 100%;
-      }
-  
-      .result-actions button {
-        flex: 1;
-      }
-  
-      .validation-status {
-        flex-direction: column;
-        gap: 1rem;
-      }
-  
-      .positions-table {
-        font-size: 0.875rem;
-      }
-  
-      .positions-table th,
-      .positions-table td {
-        padding: 0.5rem;
-      }
-    }
-  </style>
+  @media (max-width: 768px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .result-header { flex-direction: column; align-items: flex-start; }
+  }
+</style>
