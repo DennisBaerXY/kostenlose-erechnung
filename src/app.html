@@ -1,12 +1,79 @@
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		%sveltekit.head%
-	</head>
-	<body data-sveltekit-preload-data="hover">
-		<div style="display: contents">%sveltekit.body%</div>
-	</body>
+<!DOCTYPE html>
+<html lang="de" data-color-scheme="light">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="description"
+		content="Erstellen und prüfen Sie XRechnungen und ZUGFeRD-konforme E-Rechnungen kostenlos online. Einfach, schnell und direkt im Browser - ideal für Freelancer und Kleinunternehmer." />
+	<meta name="keywords"
+		content="E-Rechnung, XRechnung, ZUGFeRD, elektronische Rechnung, Rechnungserstellung, kostenlos, online, Deutschland" />
+	<meta name="author" content="kostenlose-erechnung.de" />
+
+	<!-- Open Graph / Social Media Meta Tags -->
+	<meta property="og:title" content="Kostenlose E-Rechnung - XRechnung & ZUGFeRD online erstellen" />
+	<meta property="og:description"
+		content="Erstellen Sie gesetzeskonforme E-Rechnungen kostenlos im Browser. Keine Registrierung erforderlich." />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://kostenlose-erechnung.de" />
+	<meta property="og:image" content="https://kostenlose-erechnung.de/og-image.png" />
+	<meta property="og:locale" content="de_DE" />
+
+	<!-- Twitter Card Meta Tags -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Kostenlose E-Rechnung - XRechnung & ZUGFeRD" />
+	<meta name="twitter:description" content="Erstellen Sie gesetzeskonforme E-Rechnungen kostenlos im Browser." />
+	<meta name="twitter:image" content="https://kostenlose-erechnung.de/twitter-card.png" />
+
+	<!-- Favicon -->
+	<link rel="icon" type="image/png" href="/favicon.png" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+	<!-- Preconnect to improve performance -->
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+	<title>Kostenlose E-Rechnung - XRechnung & ZUGFeRD online erstellen</title>
+
+	<!-- Schema.org structured data -->
+	<script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Kostenlose E-Rechnung",
+      "description": "Online-Tool zum Erstellen und Prüfen von XRechnungen und ZUGFeRD-konformen E-Rechnungen",
+      "url": "https://kostenlose-erechnung.de",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "featureList": [
+        "XRechnung erstellen",
+        "ZUGFeRD erstellen",
+        "E-Rechnung prüfen",
+        "XML-Export",
+        "Keine Registrierung erforderlich"
+      ]
+    }
+    </script>
+
+	%sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+	<div style="display: contents">%sveltekit.body%</div>
+
+	<!-- No-JS fallback -->
+	<noscript>
+		<div style="padding: 2rem; text-align: center; background: #fff3cd; color: #856404;">
+			<h2>JavaScript erforderlich</h2>
+			<p>Diese Anwendung benötigt JavaScript, um ordnungsgemäß zu funktionieren. Bitte aktivieren Sie JavaScript
+				in Ihrem Browser.</p>
+		</div>
+	</noscript>
+</body>
+
 </html>
