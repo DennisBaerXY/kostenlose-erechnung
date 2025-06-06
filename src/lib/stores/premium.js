@@ -8,7 +8,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 export const savedInvoices = writable([]);
 export const templates = writable([]);
 export const customers = writable([]);
-export const apiKeys = writable([]);
+
 export const loading = writable(false);
 
 // Cloud Storage Functions
@@ -251,75 +251,6 @@ export async function deleteCustomer(customerId) {
 	}
 }
 
-// API Key Management
-export async function generateApiKey(name) {
-	loading.set(true);
-	try {
-		const token = await getAccessToken();
-		const response = await fetch(`${API_URL}/api-keys`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify({ name })
-		});
-
-		if (!response.ok) throw new Error("Failed to generate API key");
-
-		const apiKey = await response.json();
-		apiKeys.update((keys) => [...keys, apiKey]);
-		return apiKey;
-	} catch (error) {
-		console.error("Generate API key error:", error);
-		throw error;
-	} finally {
-		loading.set(false);
-	}
-}
-
-export async function loadApiKeys() {
-	loading.set(true);
-	try {
-		const token = await getAccessToken();
-		const response = await fetch(`${API_URL}/api-keys`, {
-			headers: {
-				Authorization: `Bearer ${token}`
-			}
-		});
-
-		if (!response.ok) throw new Error("Failed to load API keys");
-
-		const keys = await response.json();
-		apiKeys.set(keys);
-		return keys;
-	} catch (error) {
-		console.error("Load API keys error:", error);
-		throw error;
-	} finally {
-		loading.set(false);
-	}
-}
-
-export async function revokeApiKey(keyId) {
-	try {
-		const token = await getAccessToken();
-		const response = await fetch(`${API_URL}/api-keys/${keyId}`, {
-			method: "DELETE",
-			headers: {
-				Authorization: `Bearer ${token}`
-			}
-		});
-
-		if (!response.ok) throw new Error("Failed to revoke API key");
-
-		apiKeys.update((keys) => keys.filter((key) => key.id !== keyId));
-	} catch (error) {
-		console.error("Revoke API key error:", error);
-		throw error;
-	}
-}
-
 // User Profile Management
 export async function getUserProfile() {
 	try {
@@ -402,7 +333,6 @@ export async function deleteAllUserData() {
 		savedInvoices.set([]);
 		templates.set([]);
 		customers.set([]);
-		apiKeys.set([]);
 
 		return true;
 	} catch (error) {

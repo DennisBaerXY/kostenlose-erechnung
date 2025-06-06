@@ -29,16 +29,13 @@
       { name: 'Cloud-Speicherung', free: '❌', premium: '✅ Unbegrenzt' },
       { name: 'Rechnungsvorlagen', free: '❌', premium: '✅ Unbegrenzt' },
       { name: 'Kundenverwaltung', free: '❌', premium: '✅ Mit Autofill' },
-      { name: 'API-Zugang', free: '❌', premium: '✅ REST API' },
-      { name: 'Datenexport', free: 'PDF/XML', premium: 'PDF/XML/CSV/Excel' },
-      { name: 'Support', free: 'Community', premium: 'Priorität' },
-      { name: 'Datenspeicherung', free: 'Lokal', premium: 'Cloud (verschlüsselt)' }
+      { name: 'Datenspeicherung', free: 'Lokal', premium: 'Cloud' }
     ];
   </script>
   
   <svelte:head>
     <title>Preise & Premium-Features | kostenlose-erechnung.de</title>
-    <meta name="description" content="Upgraden Sie auf Premium für unbegrenzte E-Rechnungen, Cloud-Speicherung, Vorlagen und API-Zugang. Ab 9,99€/Monat." />
+    <meta name="description" content="Upgraden Sie auf Premium für unbegrenzte E-Rechnungen, Cloud-Speicherung und Vorlagen. Ab 4,99€/Monat." />
   </svelte:head>
   
   <div class="pricing-container">
@@ -79,23 +76,23 @@
         <div class="plan-features">
           <ul>
             <li>
-              <span class="icon">✅</span>
+              
               5 E-Rechnungen pro Monat
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               XRechnung & ZUGFeRD
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               PDF & XML Export
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               Rechnungsprüfung
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               Keine Registrierung nötig
             </li>
           </ul>
@@ -128,35 +125,30 @@
         <div class="plan-features">
           <ul>
             <li>
-              <span class="icon">✅</span>
+               
+                Alle Funktionen des kostenlosen Plans
+            </li>
+            <li>
+          
               <strong>Unbegrenzte</strong> E-Rechnungen
             </li>
             <li>
-              <span class="icon">✅</span>
+             
               Cloud-Speicherung (verschlüsselt)
             </li>
             <li>
-              <span class="icon">✅</span>
+             
               Rechnungsvorlagen
             </li>
             <li>
-              <span class="icon">✅</span>
+          
               Kundenverwaltung mit Autofill
             </li>
+        
+        
+          
             <li>
-              <span class="icon">✅</span>
-              API-Zugang
-            </li>
-            <li>
-              <span class="icon">✅</span>
-              Excel & CSV Export
-            </li>
-            <li>
-              <span class="icon">✅</span>
-              Prioritäts-Support
-            </li>
-            <li>
-              <span class="icon">✅</span>
+         
               DSGVO-konformer Datenexport
             </li>
           </ul>
@@ -191,35 +183,35 @@
         <div class="plan-features">
           <ul>
             <li>
-              <span class="icon">✅</span>
+              
               Alle Premium-Features
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               Mehrere Benutzer
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               SSO Integration
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               Dedizierte Server
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               On-Premise Option
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               SLA Garantie
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               Persönlicher Account Manager
             </li>
             <li>
-              <span class="icon">✅</span>
+              
               Individuelle Anpassungen
             </li>
           </ul>

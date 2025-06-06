@@ -142,13 +142,7 @@
           >
             Vorlagen
           </button>
-          <button 
-            class="tab" 
-            class:active={activeTab === 'api'}
-            on:click={() => activeTab = 'api'}
-          >
-            API
-          </button>
+        
         </nav>
         
         <div class="tab-content">
@@ -343,61 +337,6 @@
               {/if}
             </div>
             
-          {:else if activeTab === 'api'}
-            <div class="api-section">
-              <h2>API-Zugang</h2>
-              <p>Integrieren Sie die E-Rechnungserstellung in Ihre eigenen Anwendungen.</p>
-              
-              <div class="api-info">
-                <h3>Ihre API-Endpunkte</h3>
-                <div class="endpoint-list">
-                  <div class="endpoint">
-                    <code>POST /api/v1/invoices</code>
-                    <span>Neue Rechnung erstellen</span>
-                  </div>
-                  <div class="endpoint">
-                    <code>GET /api/v1/invoices</code>
-                    <span>Rechnungen abrufen</span>
-                  </div>
-                  <div class="endpoint">
-                    <code>GET /api/v1/customers</code>
-                    <span>Kunden abrufen</span>
-                  </div>
-                  <div class="endpoint">
-                    <code>POST /api/v1/validate</code>
-                    <span>Rechnung validieren</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="api-keys">
-                <h3>API-Schlüssel</h3>
-                <div class="api-key-list">
-                  <div class="api-key-item">
-                    <div class="key-info">
-                      <strong>Production API Key</strong>
-                      <span>Erstellt am {formatDate(new Date())}</span>
-                    </div>
-                    <div class="key-value">
-                      <code>sk_live_****************************</code>
-                      <button class="btn-icon" title="Kopieren">📋</button>
-                    </div>
-                  </div>
-                </div>
-                
-                <button class="btn btn-secondary">
-                  + Neuen API-Schlüssel generieren
-                </button>
-              </div>
-              
-              <div class="api-docs">
-                <h3>Dokumentation</h3>
-                <p>Vollständige API-Dokumentation mit Beispielen in verschiedenen Programmiersprachen.</p>
-                <a href="/api-docs" class="btn btn-primary">
-                  API-Dokumentation öffnen
-                </a>
-              </div>
-            </div>
           {/if}
         </div>
       </div>
@@ -739,64 +678,8 @@
       display: flex;
       gap: 0.5rem;
     }
+   
     
-    .api-info,
-    .api-keys,
-    .api-docs {
-      background: var(--bg-light);
-      padding: 2rem;
-      border-radius: var(--radius);
-      margin-bottom: 2rem;
-    }
-    
-    .endpoint-list {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    
-    .endpoint {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem;
-      background: var(--bg-white);
-      border-radius: var(--radius);
-    }
-    
-    .endpoint code {
-      font-family: monospace;
-      font-weight: 600;
-      color: var(--primary-dark);
-    }
-    
-    .api-key-item {
-      background: var(--bg-white);
-      padding: 1rem;
-      border-radius: var(--radius);
-      margin-bottom: 1rem;
-    }
-    
-    .key-info {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-    }
-    
-    .key-value {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .key-value code {
-      flex: 1;
-      padding: 0.5rem;
-      background: var(--bg-light);
-      border-radius: var(--radius);
-      font-family: monospace;
-    }
     
     @media (max-width: 768px) {
       .dashboard-header {

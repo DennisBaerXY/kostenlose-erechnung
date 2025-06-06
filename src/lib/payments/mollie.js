@@ -8,28 +8,21 @@ export const PLANS = {
 	monthly: {
 		id: "premium_monthly",
 		name: "Premium Monatlich",
-		price: 9.99,
+		price: 4.99,
 		interval: "monthly",
 		features: [
 			"Unbegrenzte E-Rechnungen",
 			"Cloud-Speicherung",
 			"Rechnungsvorlagen",
-			"Kundenverwaltung",
-			"API-Zugang",
-			"Prioritäts-Support"
+			"Kundenverwaltung"
 		]
 	},
 	yearly: {
 		id: "premium_yearly",
 		name: "Premium Jährlich",
-		price: 99.99,
+		price: 49.99,
 		interval: "yearly",
-		features: [
-			"Alle Premium-Features",
-			"2 Monate gratis",
-			"Erweiterte API-Limits",
-			"Dedizierter Support"
-		]
+		features: ["Alle Premium-Features", "2 Monate gratis"]
 	}
 };
 
