@@ -153,7 +153,9 @@ function extractMetadata(xmlDoc, syntax) {
 		return {
 			invoiceNumber: getText(root, ".//cbc:ID", ns),
 			date: getText(root, ".//cbc:IssueDate", ns),
-			dueDate: getText(root, ".//cbc:DueDate", ns),
+			dueDate:
+				getText(root, ".//cbc:DueDate", ns) ||
+				getText(root, ".//cbc:InvoiceDueDate", ns),
 			currency:
 				root.getElementsByTagNameNS(NS.CBC, "DocumentCurrencyCode")[0]
 					?.textContent || "EUR"
@@ -212,6 +214,11 @@ function extractParty(xmlDoc, syntax, type) {
 				".//cac:Party/cac:PartyTaxScheme[cac:TaxScheme/cbc:ID='VAT']/cbc:CompanyID",
 				ns
 			),
+			personalTAXID: getText(
+				partyNode,
+				".//cac:Party/cac:PartyTaxScheme[cac:TaxScheme/cbc:ID='FC']/cbc:CompanyID",
+				ns
+			),
 			contact: {
 				name: getText(partyNode, ".//cac:Party/cac:Contact/cbc:Name", ns),
 				phone: getText(partyNode, ".//cac:Party/cac:Contact/cbc:Telephone", ns),
@@ -243,6 +250,11 @@ function extractParty(xmlDoc, syntax, type) {
 			ustId: getText(
 				partyNode,
 				".//ram:SpecifiedTaxRegistration[ram:ID/@schemeID='VA']/ram:ID",
+				ns
+			),
+			personalTAXID: getText(
+				partyNode,
+				".//ram:SpecifiedTaxRegistration[ram:ID/@schemeID='FC']/ram:ID",
 				ns
 			),
 			contact: {
