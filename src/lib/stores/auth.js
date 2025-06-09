@@ -4,6 +4,58 @@ import { browser } from "$app/environment";
 // User authentication state
 export const currentUser = writable(null);
 export const isAuthenticated = derived(currentUser, ($user) => !!$user);
+export const isLoading = writable(true);
+
+export async function initializeAuth() {
+	if (!browser) return;
+
+	try {
+		isLoading.set(true);
+		const user = authAPI.getCurrentUser();
+
+		if (user && authAPI.isAuthenticated()) {
+			currentUser.set(user);
+
+			// Try to refresh token to ensure it's still valid
+			try {
+				await authAPI.refreshToken();
+			} catch (error) {
+				console.log("Token refresh failed, user needs to login again");
+				currentUser.set(null);
+				authAPI.logout();
+			}
+		}
+	} catch (error) {
+		console.log("Auth initialization failed:", error);
+		currentUser.set(null);
+	} finally {
+		isLoading.set(false);
+	}
+}
+
+export async function signUpUser(email, password, givenName, familyName) {
+	return await authAPI.register(email, password, givenName, familyName);
+}
+
+export async function signInUser(email, password) {
+	const result = await authAPI.login(email, password);
+
+	if (result.success) {
+		currentUser.set(result.user);
+	}
+
+	return result;
+}
+
+export async function signOutUser() {
+	await authAPI.logout();
+	currentUser.set(null);
+	return { success: true };
+}
+
+export async function confirmSignUpUser(email, confirmationCode) {
+	return await authAPI.confirm(email, confirmationCode);
+}
 
 // Freemium tracking
 function getMonthKey() {
