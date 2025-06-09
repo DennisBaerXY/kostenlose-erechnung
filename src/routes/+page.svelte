@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from "svelte";
+	import { slide } from "svelte/transition";
 
 	let currentFeature = 0;
 	const features = [
@@ -29,10 +30,76 @@
 		}
 	];
 
+	const howItWorksSteps = [
+		{
+			number: "1",
+			title: "Daten eingeben",
+			description:
+				"Füllen Sie das intuitive Formular mit Ihren Rechnungsdaten aus. Unser Wizard führt Sie Schritt für Schritt durch den Prozess, damit keine wichtigen Informationen vergessen werden.",
+			imageSrc: "/step1-form.png", // <-- BITTE ERSETZEN
+			imageAlt: "Screenshot des Rechnungsformulars"
+		},
+		{
+			number: "2",
+			title: "Vorschau prüfen",
+			description:
+				"Kontrollieren Sie alle Ihre Eingaben in einer klaren Live-Vorschau. Wechseln Sie mit nur einem Klick zwischen der menschenlesbaren PDF-Ansicht und dem maschinenlesbaren XML-Code.",
+			imageSrc: "/step2-preview.png", // <-- BITTE ERSETZEN
+			imageAlt: "Live-Vorschau der erstellten E-Rechnung"
+		},
+		{
+			number: "3",
+			title: "Herunterladen & Versenden",
+			description:
+				"Laden Sie Ihre fertige, valide E-Rechnung als XML-Datei herunter. Sie ist sofort bereit für den Versand per E-Mail oder den Upload in Rechnungsportale von Unternehmen und Behörden.",
+			imageSrc: "/step3-download.png", // <-- BITTE ERSETZEN
+			imageAlt: "Herunterladen der fertigen E-Rechnung"
+		}
+	];
+
 	let stats = [
 		{ value: 0, target: 5, label: "Minuten pro Rechnung", suffix: "" },
 		{ value: 0, target: 100, label: "Kostenlos", suffix: "%" }
 	];
+
+	// FAQ data
+	// FAQ data - bleibt unverändert
+	const faqs = [
+		{
+			question: "Ist der Service wirklich kostenlos?",
+			answer:
+				"Ja, die Grundfunktionen zum Erstellen und Prüfen von E-Rechnungen sind dauerhaft kostenlos. Keine versteckten Gebühren."
+		},
+		{
+			question: "Wie kann dieser Service kostenlos sein?",
+			answer:
+				"Unser Ziel ist es, den Einstieg in die E-Rechnung für Freelancer und Kleinunternehmer so einfach wie möglich zu machen. Wir bieten die Basisfunktionen kostenlos an, um die Digitalisierung zu fördern. Zukünftig planen wir, optionale Premium-Funktionen anzubieten, die unser Projekt finanzieren."
+		},
+		{
+			question: "Muss ich mich registrieren?",
+			answer:
+				"Nein, Sie können sofort und ohne Registrierung E-Rechnungen erstellen und prüfen."
+		},
+		{
+			question: "Welche Formate werden unterstützt?",
+			answer:
+				"Wir unterstützen die aktuellsten Versionen von XRechnung(Cii und UBL) und ZUGFeRD (ab 2.1.1, Profil EN 16931). Damit sind Sie für den Rechnungsaustausch mit Behörden (B2G) und Unternehmen (B2B) bestens gerüstet."
+		},
+		{
+			question: "Sind meine Daten sicher?",
+			answer:
+				"Absolut. Ihre Sicherheit hat für uns höchste Priorität. Die gesamte Datenverarbeitung findet nur temporär in Ihrem Browser statt und wird niemals auf unseren Servern gespeichert. Die Verbindung zu unserer Seite ist durchgehend SSL/TLS-verschlüsselt. Sie behalten die volle Kontrolle über Ihre Daten."
+		}
+	];
+
+	let activeFaq = null;
+	const toggleFaq = (index) => {
+		if (activeFaq === index) {
+			activeFaq = null;
+		} else {
+			activeFaq = index;
+		}
+	};
 
 	onMount(() => {
 		// Animate stats
@@ -124,33 +191,19 @@
 			<p>In nur drei Schritten zu Ihrer fertigen E-Rechnung</p>
 		</div>
 
-		<div class="steps-grid">
-			<div class="step">
-				<div class="step-number">1</div>
-				<h3>Daten eingeben</h3>
-				<p>
-					Füllen Sie das intuitive Formular mit Ihren Rechnungsdaten aus. Unser
-					Wizard führt Sie Schritt für Schritt durch den Prozess.
-				</p>
-			</div>
-
-			<div class="step">
-				<div class="step-number">2</div>
-				<h3>Vorschau prüfen</h3>
-				<p>
-					Kontrollieren Sie Ihre Rechnung in der Live-Vorschau. Wechseln Sie
-					zwischen PDF-Ansicht und XML-Code.
-				</p>
-			</div>
-
-			<div class="step">
-				<div class="step-number">3</div>
-				<h3>Herunterladen</h3>
-				<p>
-					Laden Sie Ihre fertige E-Rechnung als XML-Datei herunter - bereit für
-					den Versand an Ihre Kunden.
-				</p>
-			</div>
+		<div class="steps-alternating">
+			{#each howItWorksSteps as step, i}
+				<div class="step-item">
+					<div class="step-text">
+						<span class="step-number">{step.number}</span>
+						<h3>{step.title}</h3>
+						<p>{step.description}</p>
+					</div>
+					<div class="step-image">
+						<img src={step.imageSrc} alt={step.imageAlt} />
+					</div>
+				</div>
+			{/each}
 		</div>
 	</div>
 </section>
@@ -232,38 +285,20 @@
 			<h2>Häufig gestellte Fragen</h2>
 		</div>
 
-		<div class="faq-grid">
-			<div class="faq-item">
-				<h4>Ist der Service wirklich kostenlos?</h4>
-				<p>
-					Ja, die Grundfunktionen zum Erstellen und Prüfen von E-Rechnungen sind
-					dauerhaft kostenlos. Keine versteckten Gebühren.
-				</p>
-			</div>
-
-			<div class="faq-item">
-				<h4>Muss ich mich registrieren?</h4>
-				<p>
-					Nein, Sie können sofort und ohne Registrierung E-Rechnungen erstellen
-					und prüfen.
-				</p>
-			</div>
-
-			<div class="faq-item">
-				<h4>Welche Formate werden unterstützt?</h4>
-				<p>
-					Wir unterstützen XRechnung und ZUGFeRD - die beiden wichtigsten
-					Standards für E-Rechnungen in Deutschland.
-				</p>
-			</div>
-
-			<div class="faq-item">
-				<h4>Sind meine Daten sicher?</h4>
-				<p>
-					Ihre Daten werden ausschließlich zur Erstellung der Rechnung verwendet
-					und nicht gespeichert. Alles läuft verschlüsselt ab.
-				</p>
-			</div>
+		<div class="faq-accordion">
+			{#each faqs as faq, i}
+				<div class="faq-item" class:active={activeFaq === i}>
+					<button class="faq-question" on:click={() => toggleFaq(i)}>
+						<span>{faq.question}</span>
+						<span class="faq-icon">{activeFaq === i ? "−" : "+"}</span>
+					</button>
+					{#if activeFaq === i}
+						<div class="faq-answer" transition:slide|local={{ duration: 300 }}>
+							<p>{faq.answer}</p>
+						</div>
+					{/if}
+				</div>
+			{/each}
 		</div>
 	</div>
 </section>
@@ -277,7 +312,11 @@
 				<a href="/erstellen" class="btn btn-primary btn-large">
 					Jetzt E-Rechnung erstellen
 				</a>
-				<a href="/auslesen" class="btn btn-secondary btn-large">
+				<a
+					href="/auslesen"
+					class="btn btn-secondary btn-large"
+					style="color: #ffffff;"
+				>
 					E-Rechnung prüfen
 				</a>
 			</div>
@@ -286,38 +325,117 @@
 </section>
 
 <style>
+	/* CSS Custom Properties für bessere Wartbarkeit */
+	:root {
+		/* Responsive spacing */
+		--section-padding: clamp(3rem, 8vw, 4rem);
+		--container-padding: clamp(1rem, 4vw, 2rem);
+		--grid-gap: clamp(1rem, 3vw, 3rem);
+	}
+
+	/* Container mit fluid width */
+	.container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 var(--container-padding);
+		width: 100%;
+	}
+
+	/* Responsive Typography */
+	h1 {
+		font-size: clamp(2rem, 5vw, 3.5rem);
+		line-height: 1.2;
+		font-weight: 800;
+		color: var(--text-dark);
+		margin-bottom: 1.5rem;
+	}
+
+	h2 {
+		font-size: clamp(1.75rem, 4vw, 2.5rem);
+		line-height: 1.3;
+		font-weight: 700;
+		color: var(--text-dark);
+	}
+
+	h3 {
+		font-size: clamp(1.25rem, 3vw, 1.5rem);
+		line-height: 1.4;
+		font-weight: 600;
+		color: var(--text-dark);
+	}
+
+	h4 {
+		font-size: clamp(1.125rem, 2.5vw, 1.25rem);
+		line-height: 1.4;
+		font-weight: 600;
+		color: var(--text-dark);
+	}
+
+	p {
+		font-size: clamp(1rem, 2vw, 1.125rem);
+		line-height: 1.6;
+	}
+
+	/* Button Styles */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.875rem 2rem;
+		border-radius: var(--radius);
+		text-decoration: none;
+		font-weight: 600;
+		transition: all 0.3s ease;
+		cursor: pointer;
+		border: none;
+		font-size: 1rem;
+		min-height: 48px; /* Touch-friendly */
+		white-space: nowrap;
+	}
+
+	.btn-large {
+		padding: 1rem 2.5rem;
+		font-size: clamp(1rem, 2.5vw, 1.125rem);
+		min-height: 56px;
+	}
+
+	/* Hero Section */
 	.hero {
-		padding: 6rem 0 4rem;
+		padding: var(--section-padding) 0;
 		background: linear-gradient(
 			135deg,
 			var(--bg-white) 0%,
 			var(--bg-light) 100%
 		);
 		overflow: hidden;
+		min-height: 60vh;
+		display: flex;
+		align-items: center;
 	}
 
 	.hero-content {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 4rem;
+		gap: var(--grid-gap);
 		align-items: center;
 	}
 
-	.hero-text h1 {
-		margin-bottom: 1.5rem;
+	.hero-text {
+		max-width: 100%;
 	}
 
 	.highlight {
 		text-decoration: underline;
 		text-decoration-color: var(--primary-color);
-		text-decoration-thickness: 1rem;
+		text-decoration-thickness: clamp(3px, 1vw, 8px);
 		text-underline-offset: 8px;
 	}
 
 	.hero-description {
-		font-size: 1.25rem;
+		font-size: clamp(1.125rem, 2.5vw, 1.25rem);
 		color: var(--text-light);
 		margin-bottom: 2rem;
+		line-height: 1.6;
 	}
 
 	.hero-actions {
@@ -326,46 +444,52 @@
 		flex-wrap: wrap;
 	}
 
-	.btn-large {
-		padding: 1rem 2.5rem;
-		font-size: 1.125rem;
-	}
-
 	.hero-image {
 		position: relative;
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		min-height: 400px;
 
 		border-radius: var(--radius-lg);
-		padding: 2rem;
+		padding: 1rem;
+		overflow: hidden;
 	}
 
 	.hero-image img {
 		width: 100%;
 		height: auto;
+		max-width: clamp(250px, 35vw, 350px);
+		max-height: 500px;
+		object-fit: contain;
+		object-position: center;
 		filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.1));
 	}
 
+	/* Features Section */
 	.features {
-		padding: 4rem 0;
+		padding: var(--section-padding) 0;
 		background: var(--bg-white);
 	}
 
 	.features-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-		gap: 1.5rem;
+		grid-template-columns: 1fr 1fr;
+		gap: clamp(1rem, 3vw, 1.5rem);
 	}
 
 	.feature-card {
 		background: var(--bg-light);
-		padding: 2rem;
+		padding: clamp(1.5rem, 4vw, 2rem);
 		border-radius: var(--radius-lg);
 		text-align: center;
 		transition: all 0.3s ease;
 		border: 2px solid transparent;
+		min-height: 200px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+
+		width: 100%;
 	}
 
 	.feature-card.active {
@@ -376,23 +500,24 @@
 	}
 
 	.feature-icon {
-		font-size: 3rem;
+		font-size: clamp(2rem, 5vw, 3rem);
 		display: block;
 		margin-bottom: 1rem;
 	}
 
 	.feature-card h3 {
-		font-size: 1.25rem;
 		margin-bottom: 0.5rem;
 	}
 
 	.feature-card p {
 		color: var(--text-light);
 		margin: 0;
+		font-size: clamp(0.9rem, 2vw, 1rem);
 	}
 
+	/* Stats Section */
 	.stats {
-		padding: 4rem 0;
+		padding: var(--section-padding) 0;
 		background: var(--text-dark);
 		color: var(--bg-white);
 	}
@@ -400,92 +525,109 @@
 	.stats-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 3rem;
+		gap: var(--grid-gap);
 		text-align: center;
 	}
 
 	.stat-value {
-		font-size: 3rem;
+		font-size: clamp(2rem, 6vw, 3rem);
 		font-weight: 800;
 		color: var(--primary-color);
 		margin-bottom: 0.5rem;
 	}
 
 	.stat-label {
-		font-size: 1.125rem;
+		font-size: clamp(1rem, 2.5vw, 1.125rem);
 		opacity: 0.9;
 	}
 
+	/* How it works Section */
 	.how-it-works {
-		padding: 6rem 0;
+		padding: var(--section-padding) 0;
 		background: var(--bg-light);
 	}
 
-	.section-header {
-		text-align: center;
-		margin-bottom: 4rem;
+	.steps-alternating {
+		display: flex;
+		flex-direction: column;
+		gap: clamp(
+			4rem,
+			10vw,
+			6rem
+		); /* Größerer Abstand zwischen den vertikalen Schritten */
 	}
 
-	.section-header h2 {
-		margin-bottom: 0.5rem;
-	}
-
-	.section-header p {
-		font-size: 1.25rem;
-		color: var(--text-light);
-		margin: 0;
-	}
-
-	.steps-grid {
+	.step-item {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 3rem;
+		grid-template-columns: 1fr 1fr;
+		gap: clamp(2rem, 5vw, 4rem);
+		align-items: center;
 	}
 
-	.step {
-		text-align: center;
+	/* Kehrt die Reihenfolge für jedes zweite Element um */
+	.step-item:nth-child(even) .step-text {
+		order: 2;
+	}
+	.step-item:nth-child(even) .step-image {
+		order: 1;
+	}
+
+	.step-text {
+		text-align: left;
 	}
 
 	.step-number {
-		width: 80px;
-		height: 80px;
-		background: var(--primary-color);
-		color: var(--text-dark);
-		font-size: 2rem;
-		font-weight: 800;
-		border-radius: 50%;
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		margin: 0 auto 1.5rem;
-		box-shadow: var(--shadow);
+		width: 48px;
+		height: 48px;
+		background: var(--primary-color);
+		color: var(--text-dark);
+		font-size: 1.5rem;
+		font-weight: 700;
+		border-radius: 50%;
+		margin-bottom: 1.5rem;
 	}
 
-	.step h3 {
-		margin-bottom: 0.5rem;
+	.step-text h3 {
+		margin-bottom: 1rem;
 	}
 
-	.step p {
+	.step-text p {
 		color: var(--text-light);
 		margin: 0;
 	}
 
+	.step-image img {
+		width: 100%;
+		height: auto;
+		border-radius: var(--radius-lg);
+		box-shadow: var(
+			--shadow-xl,
+			0 20px 25px -5px rgba(0, 0, 0, 0.1),
+			0 10px 10px -5px rgba(0, 0, 0, 0.04)
+		);
+		border: 1px solid #ddd;
+	}
+
+	/* Benefits Section */
 	.benefits {
-		padding: 6rem 0;
+		padding: var(--section-padding) 0;
 		background: var(--bg-white);
 	}
 
 	.benefits-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 4rem;
+		gap: var(--grid-gap);
 		align-items: center;
 	}
 
 	.benefit-list {
 		display: flex;
 		flex-direction: column;
-		gap: 2rem;
+		gap: clamp(1.5rem, 3vw, 2rem);
 		margin-top: 2rem;
 	}
 
@@ -496,7 +638,7 @@
 	}
 
 	.benefit-icon {
-		font-size: 2rem;
+		font-size: clamp(1.5rem, 3vw, 2rem);
 		flex-shrink: 0;
 	}
 
@@ -511,7 +653,7 @@
 
 	.visual-card {
 		background: var(--bg-light);
-		padding: 2rem;
+		padding: clamp(1.5rem, 4vw, 2rem);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow);
 	}
@@ -520,6 +662,7 @@
 		font-weight: 600;
 		margin-bottom: 1.5rem;
 		text-align: center;
+		font-size: clamp(1rem, 2.5vw, 1.125rem);
 	}
 
 	.visual-content {
@@ -548,28 +691,72 @@
 		width: 60%;
 	}
 
+	/* FAQ Section */
 	.faq {
-		padding: 6rem 0;
+		padding: var(--section-padding) 0;
 		background: var(--bg-light);
 	}
 
-	.faq-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 3rem;
+	.faq-accordion {
+		max-width: 800px;
+		margin: 0 auto;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 	}
 
-	.faq-item h4 {
-		margin-bottom: 0.5rem;
+	.faq-item {
+		background: var(--bg-white);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow);
+		border: 1px solid var(--border-color, #eee);
+		transition: border-color 0.3s ease;
 	}
 
-	.faq-item p {
+	.faq-item.active {
+		border-color: var(--primary-color);
+	}
+
+	.faq-question {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		width: 100%;
+		text-align: left;
+		padding: clamp(1.25rem, 3vw, 1.5rem);
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: clamp(1.1rem, 2.5vw, 1.2rem);
+		font-weight: 600;
+		color: var(--text-dark);
+	}
+
+	.faq-icon {
+		font-size: 1.5rem;
+		font-weight: 500;
+		color: var(--primary-color);
+		transition: transform 0.2s ease;
+	}
+
+	.faq-item.active .faq-icon {
+		transform: rotate(180deg);
+	}
+
+	.faq-answer {
+		padding: 0 clamp(1.25rem, 3vw, 1.5rem) clamp(1.25rem, 3vw, 1.5rem);
 		color: var(--text-light);
-		margin: 0;
+		/* The slide transition handles the animation */
 	}
 
+	.faq-answer p {
+		margin: 0;
+		padding-bottom: clamp(1.25rem, 3vw, 1.5rem);
+	}
+
+	/* CTA Section */
 	.cta {
-		padding: 6rem 0;
+		padding: var(--section-padding) 0;
 		background: linear-gradient(135deg, var(--text-dark) 0%, #2a2a2a 100%);
 		color: var(--bg-white);
 		text-align: center;
@@ -581,7 +768,7 @@
 	}
 
 	.cta-content p {
-		font-size: 1.25rem;
+		font-size: clamp(1.125rem, 2.5vw, 1.25rem);
 		opacity: 0.9;
 		margin-bottom: 2rem;
 	}
@@ -593,51 +780,175 @@
 		flex-wrap: wrap;
 	}
 
-	@media (max-width: 968px) {
+	/* Mobile First Media Queries */
+	@media (max-width: 760px) {
+		:root {
+			--section-padding: clamp(2rem, 6vw, 4rem);
+			--container-padding: 1rem;
+			--grid-gap: clamp(1rem, 4vw, 2rem);
+		}
+
 		.hero-content,
 		.benefits-grid {
 			grid-template-columns: 1fr;
-			gap: 3rem;
+			gap: 2rem;
 		}
 
 		.hero-image {
-			order: -1;
-			min-height: 300px;
+			min-height: 200px;
+			padding: 0.5rem;
+		}
+
+		.hero-image {
+			min-height: 450px;
+		}
+
+		.hero-image img {
+			max-width: 400px;
+			max-height: 600px;
+		}
+
+		.hero-actions {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.btn-large {
+			width: 100%;
+			justify-content: center;
+		}
+		.step-item {
+			grid-template-columns: 1fr; /* Einzelne Spalte auf Mobilgeräten */
+			text-align: center;
+		}
+
+		/* Auf Mobilgeräten die Reihenfolge zurücksetzen und zentrieren */
+		.step-item:nth-child(even) .step-text,
+		.step-item:nth-child(even) .step-image {
+			order: initial;
+		}
+
+		.step-text {
+			text-align: center;
+		}
+
+		.step-number {
+			margin-left: auto;
+			margin-right: auto;
+		}
+
+		.stats-grid {
+			grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		}
+
+		.features-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.steps-grid {
+			grid-template-columns: 1fr;
 		}
 
 		.visual-card {
 			display: none;
 		}
-	}
 
-	@media (max-width: 768px) {
-		.hero {
-			padding: 4rem 0 3rem;
-		}
-
-		.hero-text h1 {
-			font-size: 2rem;
-		}
-
-		.hero-description {
-			font-size: 1.125rem;
-		}
-
-		.hero-actions {
+		.benefit-item {
 			flex-direction: column;
+			text-align: center;
+			gap: 1rem;
 		}
 
-		.btn-large {
-			width: 100%;
-		}
-
-		.stats-grid {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 2rem;
-		}
-
-		.stat-value {
-			font-size: 2rem;
+		.cta-actions {
+			flex-direction: column;
+			align-items: stretch;
 		}
 	}
+
+	@media (max-width: 480px) {
+		.hero {
+			min-height: auto;
+		}
+
+		.hero-image {
+			display: none;
+		}
+
+		.feature-card {
+			min-height: auto;
+			padding: 1.5rem;
+		}
+
+		.step {
+			padding: 0;
+		}
+
+		.faq-item {
+			padding: 1.5rem;
+		}
+
+		.visual-content {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	/* Large screen optimizations */
+	@media (min-width: 1200px) {
+		.container {
+			padding: 0 2rem;
+		}
+
+		.hero-content {
+			gap: 4rem;
+		}
+
+		.hero-image {
+			min-height: 450px;
+		}
+
+		.hero-image img {
+			max-width: 400px;
+			max-height: 600px;
+		}
+
+		.features-grid {
+			grid-template-columns: repeat(4, 1fr);
+		}
+
+		.steps-grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+
+	/* High DPI and print optimizations */
+	@media (min-resolution: 2dppx) {
+		.hero-image img {
+			image-rendering: crisp-edges;
+		}
+	}
+
+	/* Accessibility improvements */
+	@media (prefers-reduced-motion: reduce) {
+		.feature-card,
+		.btn,
+		.step-number {
+			transition: none;
+		}
+
+		.feature-card.active {
+			transform: none;
+		}
+
+		.btn:hover {
+			transform: none;
+		}
+	}
+
+	/* Focus styles for accessibility */
+	.btn:focus-visible {
+		outline: 2px solid var(--primary-color);
+		outline-offset: 2px;
+	}
+
+	/* Dark mode support */
 </style>

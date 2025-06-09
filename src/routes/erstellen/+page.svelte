@@ -12,8 +12,12 @@
 		downloadXRechnung,
 		validateXRechnungData
 	} from "$lib/utils/invoice-generator.js";
+
+	import { getInvoiceCount, incrementInvoiceCount } from "$lib/stores/auth.js";
+
 	import InvoicePreview from "$lib/components/InvoicePreview.svelte";
 	import XmlViewer from "$lib/components/XmlViewer.svelte";
+	import RegistrationModal from "$lib/components/RegistrationModal.svelte";
 
 	let showXml = false;
 	let validationErrors = [];
@@ -24,6 +28,8 @@
 	let showPremiumModal = false;
 	let premiumFeature = "";
 	let selectedFormat = "CII";
+	let lastCreatedInvoice = null;
+	let showRegistrationModal = false;
 
 	// Freemium Limits
 	const LIMITS = {
@@ -194,10 +200,10 @@
 	async function handleDownload(format = "CII") {
 		// Check limit only at download time
 		const currentCount = getInvoiceCount();
-		if (currentCount >= 5 && !globalThis.$currentUser?.premium) {
-			showLimitReachedModal = true;
-			return;
-		}
+		// if (currentCount >= 5 && !globalThis.$currentUser?.premium) {
+		// 	showLimitReachedModal = true;
+		// 	return;
+		// }
 
 		if (!validateForm()) {
 			alert(
@@ -227,9 +233,14 @@
 
 				// Show success briefly
 				showSuccess = true;
+				// if (!globalThis.$currentUser?.premium) {
+				// 	showPremiumModal = true;
+				// }
+
 				setTimeout(() => {
 					showSuccess = false;
 					// Show registration modal after success message
+
 					if (!globalThis.$currentUser) {
 						showRegistrationModal = true;
 					}
@@ -309,38 +320,13 @@
 	</div>
 {/if}
 
-<!-- Freemium Status Bar -->
-<div class="freemium-bar">
-	<div class="freemium-content">
-		{#if userTier === "free"}
-			<div class="usage-info">
-				<span class="usage-text">
-					📊 {monthlyInvoices} von {LIMITS.free.invoicesPerMonth} kostenlosen Rechnungen
-					genutzt
-				</span>
-				<div class="usage-bar">
-					<div
-						class="usage-fill"
-						style="width: {(monthlyInvoices / LIMITS.free.invoicesPerMonth) *
-							100}%"
-					></div>
-				</div>
-			</div>
-			<button
-				class="btn btn-primary btn-small"
-				on:click={() => showPremiumUpgrade("Upgrade")}
-			>
-				🚀 Upgrade zu Premium
-			</button>
-		{:else}
-			<div class="premium-status">
-				<span class="premium-badge">⭐ Premium</span>
-				<span>Unbegrenzte E-Rechnungen</span>
-			</div>
-		{/if}
-	</div>
-</div>
-
+{#if showRegistrationModal}
+	<RegistrationModal
+		invoiceData={$invoiceData}
+		{lastCreatedInvoice}
+		bind:show={showRegistrationModal}
+	/>
+{/if}
 <!-- Success/Error Messages -->
 {#if showSuccess}
 	<div class="success-banner">
@@ -883,33 +869,35 @@
 
 						<div class="download-section">
 							<h3>Format wählen</h3>
-							<label class="format-option">
-								<input
-									type="radio"
-									name="format"
-									value="CII"
-									bind:group={selectedFormat}
-								/>
-								<div class="format-content">
-									<span class="format-name">XRechnung (CII)</span>
-									<span class="format-desc"
-										>Standard für öffentliche Auftraggeber</span
-									>
-								</div>
-							</label>
+							<div class="format-download-buttons">
+								<label class="format-option">
+									<input
+										type="radio"
+										name="format"
+										value="CII"
+										bind:group={selectedFormat}
+									/>
+									<div class="format-content">
+										<span class="format-name">XRechnung (CII)</span>
+										<span class="format-desc"
+											>Standard für öffentliche Auftraggeber</span
+										>
+									</div>
+								</label>
 
-							<label class="format-option">
-								<input
-									type="radio"
-									name="format"
-									value="UBL"
-									bind:group={selectedFormat}
-								/>
-								<div class="format-content">
-									<span class="format-name">XRechnung (UBL)</span>
-									<span class="format-desc">PEPPOL-kompatibel</span>
-								</div>
-							</label>
+								<label class="format-option">
+									<input
+										type="radio"
+										name="format"
+										value="UBL"
+										bind:group={selectedFormat}
+									/>
+									<div class="format-content">
+										<span class="format-name">XRechnung (UBL)</span>
+										<span class="format-desc">PEPPOL-kompatibel</span>
+									</div>
+								</label>
+							</div>
 
 							<button
 								class="btn btn-primary btn-download"
@@ -981,6 +969,8 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		min-height: calc(100vh - 80px);
+
+		margin: 0 auto;
 	}
 
 	/* FREEMIUM STATUS BAR */
@@ -1204,9 +1194,15 @@
 
 	/* WIZARD SECTION */
 	.wizard-section {
-		padding: 2rem;
 		background: var(--bg-white);
 		overflow-y: auto;
+
+		padding: 2rem;
+
+		width: 100%;
+		max-width: 800px;
+
+		margin: 0 auto;
 	}
 
 	.wizard-header {
@@ -1528,6 +1524,12 @@
 		margin-bottom: 1rem;
 	}
 
+	.format-download-buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+	}
 	.format-options {
 		display: flex;
 		gap: 1rem;
@@ -1672,7 +1674,7 @@
 
 	@media (max-width: 1200px) {
 		.creator-container {
-			grid-template-columns: 1fr 400px;
+			grid-template-columns: 1fr 750px;
 		}
 	}
 

@@ -1,6 +1,7 @@
 <script>
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 	import { invoiceData } from "$lib/stores/invoice.js";
+	import { fade, fly } from "svelte/transition";
 
 	export let show = false;
 	export let justCreatedInvoice = null;
@@ -10,6 +11,7 @@
 	let email = "";
 	let password = "";
 	let loading = false;
+	let transition = false;
 	let error = "";
 
 	async function handleRegister() {
@@ -39,12 +41,17 @@
 
 	function skipRegistration() {
 		dispatch("skip");
+		transition = false;
 		show = false;
 	}
+
+	onMount(() => {
+		transition = true;
+	});
 </script>
 
-{#if show}
-	<div class="modal-overlay">
+{#if transition}
+	<div class="modal-overlay" in:fly={{ y: 100 }} out:fade={{ duration: 100 }}>
 		<div class="modal">
 			<div class="modal-header">
 				<h2>🎉 Ihre E-Rechnung wurde erfolgreich erstellt!</h2>

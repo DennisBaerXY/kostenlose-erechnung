@@ -325,7 +325,7 @@
 		top: 0;
 	}
 
-	@media (max-width: 768px) {
+	@media (max-width: 980px) {
 		.menu-toggle {
 			display: block;
 		}
