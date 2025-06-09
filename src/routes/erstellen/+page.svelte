@@ -192,8 +192,10 @@
 	}
 
 	async function handleDownload(format = "CII") {
-		// Prüfe Freemium-Limit
-		if (!checkInvoiceLimit()) {
+		// Check limit only at download time
+		const currentCount = getInvoiceCount();
+		if (currentCount >= 5 && !globalThis.$currentUser?.premium) {
+			showLimitReachedModal = true;
 			return;
 		}
 
@@ -207,16 +209,31 @@
 
 		try {
 			isDownloading = true;
-
-			// Kurze Verzögerung für bessere UX
 			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			const result = downloadXRechnung($invoiceData, format);
 
 			if (result.success) {
+				// Increment counter AFTER successful download
+				incrementInvoiceCount();
+
+				// Store invoice data for potential registration
+				lastCreatedInvoice = {
+					id: crypto.randomUUID(),
+					data: { ...$invoiceData },
+					createdAt: new Date().toISOString(),
+					filename: result.filename
+				};
+
+				// Show success briefly
 				showSuccess = true;
-				monthlyInvoices += 1; // Zähler erhöhen
-				setTimeout(() => (showSuccess = false), 3000);
+				setTimeout(() => {
+					showSuccess = false;
+					// Show registration modal after success message
+					if (!globalThis.$currentUser) {
+						showRegistrationModal = true;
+					}
+				}, 2000);
 			}
 		} catch (error) {
 			console.error("Download error:", error);
