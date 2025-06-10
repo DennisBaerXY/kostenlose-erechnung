@@ -160,11 +160,7 @@
     margin: 1.5rem 0;
 }
 
-.price {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-dark);
-}
+
 
 .period {
     color: var(--text-light);

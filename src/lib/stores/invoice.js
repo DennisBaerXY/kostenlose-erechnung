@@ -1,20 +1,18 @@
-// src/lib/stores/invoice.js
-
-import { writable } from "svelte/store";
+// src/lib/stores/invoice.js (REVERTED - NO RUNES)
+import { writable, derived } from "svelte/store";
 
 const initialData = {
 	sender: {
-		name: "",
-		contactName: "",
-		street: "",
-		zip: "",
-		city: "",
-		phone: "",
-		email: "",
-		taxId: "",
-		ustId: "",
+		name: "BärSolutions GmbH",
+		contactName: "Dennis Bär",
+		street: "Schwambstraße 7",
+		zip: "64287",
+		city: "Darmstadt",
+		phone: "+49 6151 123456",
+		email: "info@baersolutions.de",
+		taxId: "DE123456789",
+		ustId: "DE123456789",
 		logo: null,
-		// NEUE FELDER
 		bankDetails: {
 			accountHolder: "",
 			bankName: "",
@@ -28,28 +26,35 @@ const initialData = {
 		}
 	},
 	recipient: {
-		name: "", // Wird für den Firmennamen in der Adresse genutzt
-		street: "",
-		zip: "",
-		city: "",
-		email: "",
-		reference: "",
-		// NEUE FELDER
-		department: "",
-		contactPerson: ""
+		name: "Kunde GmbH",
+		street: "Musterstraße 1",
+		zip: "12345",
+		city: "Musterstadt",
+		email: "kunde@muster.de",
+		reference: "Bestellung 123",
+		customerNumber: "K-123456",
+		department: "Einkauf",
+		contactPerson: "Max Mustermann"
 	},
 	metadata: {
 		invoiceNumber: "",
 		date: new Date().toISOString().split("T")[0],
-		deliveryDate: "",
-		dueDate: "",
-		paymentTerms: "net30", // Behalten wir für die Fälligkeitsberechnung
-		customPaymentTerms: "", // Wird durch closingText ersetzt, aber bleibt für Kompatibilität
-		// NEUE FELDER
+		deliveryDate: new Date().toISOString().split("T")[0],
+		dueDate: new Date(new Date().setDate(new Date().getDate() + 30))
+			.toISOString()
+			.split("T")[0],
+		paymentTerms: "net30",
+
+		customPaymentTerms: "",
 		documentTitle: "Rechnung",
 		introductionText:
 			"Unsere Lieferungen/Leistungen stellen wir Ihnen wie folgt in Rechnung.",
-		closingText: "Zahlbar sofort ohne Abzug.\nVielen Dank für Ihren Auftrag."
+		closingText: `Vielen Dank für Ihren Auftrag.`,
+		customizationId:
+			"urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0",
+		profileId: "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
+		invoiceTypeCode: "380",
+		currency: "EUR"
 	},
 	items: [
 		{
@@ -59,24 +64,60 @@ const initialData = {
 			unit: "Stück",
 			unitPrice: 0,
 			taxRate: 19,
-			// NEUE FELDER
 			longDescription: "",
 			articleNumber: ""
 		}
 	]
 };
 
-// Wir exportieren den Store jetzt als invoiceData, um konsistent zu bleiben
+// Main invoice store
 export const invoiceData = writable(JSON.parse(JSON.stringify(initialData)));
 
-// Ihre bestehenden Funktionen zum Verwalten der Posten
+// Derived calculations
+export const subtotal = derived(invoiceData, ($data) =>
+	$data.items.reduce(
+		(sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
+		0
+	)
+);
+
+export const taxGroups = derived(invoiceData, ($data) =>
+	$data.items.reduce((groups, item) => {
+		const rate = item.taxRate || 19;
+		if (!groups[rate]) {
+			groups[rate] = { rate, base: 0, tax: 0 };
+		}
+		const itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+		groups[rate].base += itemTotal;
+		groups[rate].tax += (itemTotal * rate) / 100;
+		return groups;
+	}, {})
+);
+
+export const taxAmount = derived(taxGroups, ($groups) =>
+	Object.values($groups).reduce((sum, group) => sum + group.tax, 0)
+);
+
+export const total = derived(
+	[subtotal, taxAmount],
+	([$subtotal, $taxAmount]) => $subtotal + $taxAmount
+);
+
+export function calculateInvoiceTotals(invoiceData) {
+	return {
+		subtotal,
+		taxGroups,
+		total
+	};
+}
+// Action functions
 export function addInvoiceItem() {
 	invoiceData.update((data) => {
 		data.items.push({
 			id: crypto.randomUUID(),
 			description: "",
-			longDescription: "", // Neu
-			articleNumber: "", // Neu
+			longDescription: "",
+			articleNumber: "",
 			quantity: 1,
 			unit: "Stück",
 			unitPrice: 0,
@@ -102,39 +143,38 @@ export function updateInvoiceItem(id, updates) {
 		return data;
 	});
 }
-// Calculation helpers
-export function calculateInvoiceTotals(items) {
-	const subtotal = items.reduce((sum, item) => {
-		const itemTotal = item.quantity * item.unitPrice;
-		const discount = itemTotal * (item.discount / 100);
-		return sum + (itemTotal - discount);
-	}, 0);
 
-	const taxGroups = items.reduce((groups, item) => {
-		const rate = item.taxRate;
-		if (!groups[rate]) {
-			groups[rate] = { rate, base: 0, tax: 0 };
-		}
-		const itemTotal = item.quantity * item.unitPrice;
-		const discount = itemTotal * (item.discount / 100);
-		const netAmount = itemTotal - discount;
-		groups[rate].base += netAmount;
-		groups[rate].tax += netAmount * (rate / 100);
-		return groups;
-	}, {});
+// Helper functions
+export function generateInvoiceNumber() {
+	const year = new Date().getFullYear();
+	const month = String(new Date().getMonth() + 1).padStart(2, "0");
+	const day = String(new Date().getDate()).padStart(2, "0");
+	const time = Date.now().toString().slice(-4);
+	return `${year}${month}${day}-${time}`;
+}
 
-	const totalTax = Object.values(taxGroups).reduce(
-		(sum, group) => sum + group.tax,
-		0
-	);
-	const total = subtotal + totalTax;
+export function calculateDueDate(issueDate, paymentTerms) {
+	if (!issueDate || !paymentTerms) return "";
 
-	return {
-		subtotal,
-		taxGroups,
-		totalTax,
-		total
-	};
+	const date = new Date(issueDate);
+	let days = 30;
+
+	switch (paymentTerms) {
+		case "net14":
+			days = 14;
+			break;
+		case "net30":
+			days = 30;
+			break;
+		case "immediate":
+			days = 0;
+			break;
+		default:
+			days = 30;
+	}
+
+	date.setDate(date.getDate() + days);
+	return date.toISOString().split("T")[0];
 }
 
 // Validation helpers
@@ -178,32 +218,8 @@ export function validateInvoiceData(data) {
 		});
 	}
 
-	return errors;
-}
-
-// Local storage persistence
-export function saveInvoiceToLocalStorage(data) {
-	if (typeof window !== "undefined") {
-		localStorage.setItem("invoice_draft", JSON.stringify(data));
-	}
-}
-
-export function loadInvoiceFromLocalStorage() {
-	if (typeof window !== "undefined") {
-		const saved = localStorage.getItem("invoice_draft");
-		if (saved) {
-			try {
-				return JSON.parse(saved);
-			} catch (e) {
-				console.error("Failed to load saved invoice:", e);
-			}
-		}
-	}
-	return null;
-}
-
-export function clearInvoiceFromLocalStorage() {
-	if (typeof window !== "undefined") {
-		localStorage.removeItem("invoice_draft");
-	}
+	return {
+		isValid: errors.length === 0,
+		errors
+	};
 }

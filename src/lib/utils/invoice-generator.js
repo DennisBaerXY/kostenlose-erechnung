@@ -1,15 +1,18 @@
 // src/lib/utils/invoice-generator.js - XRechnung 3.0.1 konforme Generierung
 
-import { calculateInvoiceTotals } from "$lib/stores/invoice.js";
+import {
+	total,
+	subtotal,
+	taxGroups,
+	calculateInvoiceTotals
+} from "$lib/stores/invoice.js";
 
 /**
  * Generiert XRechnung 3.0.2 konforme XML in CII-Syntax
  * (Standard für ZUGFeRD und XRechnung)
  */
 export function generateXRechnungCII(invoiceData) {
-	const { subtotal, taxGroups, total } = calculateInvoiceTotals(
-		invoiceData.items
-	);
+	const { subtotal, taxGroups, total } = calculateInvoiceTotals();
 
 	// Der Anfang der XML-Datei bis <rsm:SupplyChainTradeTransaction> bleibt gleich...
 	const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -189,9 +192,7 @@ export function generateXRechnungCII(invoiceData) {
  * (Alternative Syntax, kompatibel mit PEPPOL)
  */
 export function generateXRechnungUBL(invoiceData) {
-	const { subtotal, taxGroups, total } = calculateInvoiceTotals(
-		invoiceData.items
-	);
+	const { subtotal, taxGroups, total } = calculateInvoiceTotals();
 
 	const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ubl:Invoice 
