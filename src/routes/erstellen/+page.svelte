@@ -142,14 +142,15 @@
 			}
 		}
 	}
-
 	function handleUpdateItems(event) {
 		const { type, index, field, value } = event.detail;
-
+		console.log("handleUpdateItems", type, index, field, value);
 		switch (type) {
 			case "updateItem":
 				if ($invoiceData.items[index]) {
-					updateInvoiceItem($invoiceData.items[index].id, { [field]: value });
+					// Ensure tax rate is a number
+					const processedValue = field === "taxRate" ? Number(value) : value;
+					updateInvoiceItem($invoiceData.items[index].id, { [field]: processedValue });
 				}
 				validateCurrentStep();
 				break;

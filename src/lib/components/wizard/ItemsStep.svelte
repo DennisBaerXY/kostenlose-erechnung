@@ -18,6 +18,12 @@
 		dispatch("removeItem", { type: "removeItem", index });
 	}
 
+	let taxations = [
+		{ label: "0%", value: 0 },
+		{ label: "7%", value: 7 },
+		{ label: "19%", value: 19 }
+	];
+
 	// Calculate totals
 	$: subtotal = items.reduce(
 		(sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
@@ -59,8 +65,9 @@
 
 				<div class="item-grid">
 					<div class="form-group full">
-						<label>Beschreibung *</label>
+						<label for={`description-${index}`}>Beschreibung *</label>
 						<input
+							id={`description-${index}`}
 							type="text"
 							value={item.description}
 							on:input={(e) => updateItem(index, "description", e.target.value)}
@@ -70,8 +77,9 @@
 					</div>
 
 					<div class="form-group">
-						<label>Menge *</label>
+						<label for={`quantity-${index}`}>Menge *</label>
 						<input
+							id={`quantity-${index}`}
 							type="number"
 							value={item.quantity}
 							on:input={(e) =>
@@ -83,8 +91,9 @@
 					</div>
 
 					<div class="form-group">
-						<label>Einheit</label>
+						<label for={`unit-${index}`}>Einheit</label>
 						<select
+							id={`unit-${index}`}
 							value={item.unit}
 							required
 							aria-label="Einheit auswählen"
@@ -101,8 +110,9 @@
 					</div>
 
 					<div class="form-group">
-						<label>Einzelpreis (€) *</label>
+						<label for={`unitPrice-${index}`}>Einzelpreis (€) *</label>
 						<input
+							id={`unitPrice-${index}`}
 							type="number"
 							value={item.unitPrice}
 							on:input={(e) =>
@@ -112,18 +122,18 @@
 							required
 						/>
 					</div>
-
 					<div class="form-group">
-						<label>MwSt. (%)</label>
+						<label for={`taxRate-${index}`}>MwSt. (%)</label>
 						<select
+							id={`taxRate-${index}`}
 							required
-							value={item.taxRate}
+							bind:value={item.taxRate}
 							on:change={(e) =>
-								updateItem(index, "taxRate", parseInt(e.target.value))}
+								updateItem(index, "taxRate", parseFloat(e.target.value) || 0)}
 						>
-							<option value="0">0%</option>
-							<option value="7">7%</option>
-							<option value="19">19%</option>
+							{#each taxations as tax}
+								<option value={tax.value}>{tax.label}</option>
+							{/each}
 						</select>
 					</div>
 				</div>

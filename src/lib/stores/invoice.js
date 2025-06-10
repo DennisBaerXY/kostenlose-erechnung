@@ -3,26 +3,26 @@ import { writable, derived } from "svelte/store";
 
 const initialData = {
 	sender: {
-		name: "BärSolutions GmbH",
-		contactName: "Dennis Bär",
-		street: "Schwambstraße 7",
-		zip: "64287",
-		city: "Darmstadt",
+		name: "Musterfirma GmbH",
+		contactName: "Muster Kontakt",
+		street: "Musterstraße 1",
+		zip: "12345",
+		city: "Musterstadt",
 		phone: "+49 6151 123456",
-		email: "info@baersolutions.de",
+		email: "info@musterfirma.de",
 		taxId: "DE123456789",
 		ustId: "DE123456789",
 		logo: null,
 		bankDetails: {
-			accountHolder: "",
-			bankName: "",
-			iban: "",
-			bic: ""
+			accountHolder: "Musterfirma GmbH",
+			bankName: "Musterbank",
+			iban: "DE12345678901234567890",
+			bic: "MUSTBICXXX"
 		},
 		companyInfo: {
-			managingDirector: "",
-			commercialRegister: "",
-			registerCourt: ""
+			managingDirector: "Max Mustermann",
+			commercialRegister: "HRB 12345",
+			registerCourt: "Amtsgericht Musterstadt"
 		}
 	},
 	recipient: {
@@ -121,7 +121,7 @@ export function addInvoiceItem() {
 			quantity: 1,
 			unit: "Stück",
 			unitPrice: 0,
-			taxRate: 19
+			taxRate: 19  // Default to 19% MwSt
 		});
 		return data;
 	});
