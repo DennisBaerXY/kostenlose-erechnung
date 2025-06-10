@@ -1,92 +1,107 @@
+// src/lib/stores/invoice.js
+
 import { writable } from "svelte/store";
 
-// Default invoice data structure
-const defaultInvoiceData = {
+const initialData = {
 	sender: {
 		name: "",
+		contactName: "",
 		street: "",
 		zip: "",
 		city: "",
-		email: "",
 		phone: "",
+		email: "",
 		taxId: "",
 		ustId: "",
-		bankName: "",
-		iban: "",
-		bic: ""
+		logo: null,
+		// NEUE FELDER
+		bankDetails: {
+			accountHolder: "",
+			bankName: "",
+			iban: "",
+			bic: ""
+		},
+		companyInfo: {
+			managingDirector: "",
+			commercialRegister: "",
+			registerCourt: ""
+		}
 	},
 	recipient: {
-		name: "",
+		name: "", // Wird für den Firmennamen in der Adresse genutzt
 		street: "",
 		zip: "",
 		city: "",
 		email: "",
 		reference: "",
-		customerNumber: ""
+		// NEUE FELDER
+		department: "",
+		contactPerson: ""
 	},
 	metadata: {
 		invoiceNumber: "",
 		date: new Date().toISOString().split("T")[0],
 		deliveryDate: "",
 		dueDate: "",
-		paymentTerms: "net30",
-		customPaymentTerms: "",
-		currency: "EUR",
-		invoiceType: "380" // 380 = Commercial Invoice
+		paymentTerms: "net30", // Behalten wir für die Fälligkeitsberechnung
+		customPaymentTerms: "", // Wird durch closingText ersetzt, aber bleibt für Kompatibilität
+		// NEUE FELDER
+		documentTitle: "Rechnung",
+		introductionText:
+			"Unsere Lieferungen/Leistungen stellen wir Ihnen wie folgt in Rechnung.",
+		closingText: "Zahlbar sofort ohne Abzug.\nVielen Dank für Ihren Auftrag."
 	},
-	items: [],
-	notes: {
-		introText: "",
-		outroText: ""
-	}
+	items: [
+		{
+			id: crypto.randomUUID(),
+			description: "",
+			quantity: 1,
+			unit: "Stück",
+			unitPrice: 0,
+			taxRate: 19,
+			// NEUE FELDER
+			longDescription: "",
+			articleNumber: ""
+		}
+	]
 };
 
-// Create the invoice data store
-export const invoiceData = writable(defaultInvoiceData);
+// Wir exportieren den Store jetzt als invoiceData, um konsistent zu bleiben
+export const invoiceData = writable(JSON.parse(JSON.stringify(initialData)));
 
-// Create the current step store for the wizard
-export const currentStep = writable(1);
-
-// Helper functions
-export function resetInvoice() {
-	invoiceData.set(defaultInvoiceData);
-	currentStep.set(1);
-}
-
+// Ihre bestehenden Funktionen zum Verwalten der Posten
 export function addInvoiceItem() {
-	invoiceData.update((data) => ({
-		...data,
-		items: [
-			...data.items,
-			{
-				id: Date.now(),
-				description: "",
-				quantity: 1,
-				unit: "Stück",
-				unitPrice: 0,
-				taxRate: 19,
-				discount: 0
-			}
-		]
-	}));
+	invoiceData.update((data) => {
+		data.items.push({
+			id: crypto.randomUUID(),
+			description: "",
+			longDescription: "", // Neu
+			articleNumber: "", // Neu
+			quantity: 1,
+			unit: "Stück",
+			unitPrice: 0,
+			taxRate: 19
+		});
+		return data;
+	});
 }
 
 export function removeInvoiceItem(id) {
-	invoiceData.update((data) => ({
-		...data,
-		items: data.items.filter((item) => item.id !== id)
-	}));
+	invoiceData.update((data) => {
+		data.items = data.items.filter((item) => item.id !== id);
+		return data;
+	});
 }
 
 export function updateInvoiceItem(id, updates) {
-	invoiceData.update((data) => ({
-		...data,
-		items: data.items.map((item) =>
-			item.id === id ? { ...item, ...updates } : item
-		)
-	}));
+	invoiceData.update((data) => {
+		const index = data.items.findIndex((item) => item.id === id);
+		if (index !== -1) {
+			data.items[index] = { ...data.items[index], ...updates };
+		}
+		return data;
+	});
 }
-
 // Calculation helpers
 export function calculateInvoiceTotals(items) {
 	const subtotal = items.reduce((sum, item) => {
