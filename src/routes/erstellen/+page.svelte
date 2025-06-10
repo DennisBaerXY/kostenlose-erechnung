@@ -31,8 +31,10 @@
 	import InvoicePreview from "$lib/components/InvoicePreview.svelte";
 	import XmlViewer from "$lib/components/XmlViewer.svelte";
 	import RegistrationModal from "$lib/components/RegistrationModal.svelte";
+	import PremiumModal from "$lib/components/PremiumModal.svelte";
 
 	import "./styles.css";
+	import { goto } from "$app/navigation";
 
 	// Constants
 	const LIMITS = {
@@ -51,9 +53,21 @@
 	function validateCurrentStep() {
 		const validation = validateStep($currentStep, $invoiceData);
 		uiActions.setValidationErrors(validation.errors);
+		isFormValid = validation.isValid;
 	}
 	// Initialize data on mount
 	onMount(() => {
+		wizardActions.resetWizard();
+
+		uiState.update((state) => ({
+			...state,
+			showXml: false,
+			showSuccess: false,
+			showRegistrationModal: false,
+			showPremiumModal: false,
+			validationErrors: []
+		}));
+
 		// Auto-generate invoice number if empty
 		if (!$invoiceData.metadata.invoiceNumber) {
 			const newNumber = generateInvoiceNumber();
@@ -137,6 +151,7 @@
 				if ($invoiceData.items[index]) {
 					updateInvoiceItem($invoiceData.items[index].id, { [field]: value });
 				}
+				validateCurrentStep();
 				break;
 			case "addItem":
 				addInvoiceItem();
@@ -210,21 +225,41 @@
 
 	// Event handlers for wizard
 	function handleGoToStep(event) {
+		console.log("handleGoToStep");
 		wizardActions.goToStep(event.detail.step);
 	}
 
 	function handleNextStep() {
 		validateCurrentStep();
+		if (!isFormValid) {
+			console.log("Form is not valid, cannot proceed to next step");
+			return;
+		}
 
+		console.log("Navigating to next step");
 		wizardActions.nextStep();
 	}
 
 	function handlePrevStep() {
+		validateCurrentStep();
+		if (!isFormValid) {
+			console.log("Form is not valid, cannot proceed to next step");
+			return;
+		}
+		console.log("Navigating to previous step");
 		wizardActions.prevStep();
 	}
 
 	function handlePremiumUpgrade(event) {
 		premiumActions.showPremiumUpgrade(event.detail);
+		goto("/preise");
+	}
+	function handleClose(event) {
+		uiState.update((state) => ({
+			...state,
+			showPremiumModal: false,
+			showRegistrationModal: false
+		}));
 	}
 </script>
 
@@ -238,41 +273,12 @@
 
 <!-- Premium Modal -->
 {#if $uiState.showPremiumModal}
-	<div class="modal-overlay" on:click={premiumActions.hidePremiumModal}>
-		<div class="modal" on:click|stopPropagation>
-			<div class="modal-header">
-				<h3>🚀 Premium Feature</h3>
-				<button class="modal-close" on:click={premiumActions.hidePremiumModal}
-					>✕</button
-				>
-			</div>
-			<div class="modal-content">
-				<div class="premium-icon">⭐</div>
-				<h4>{$premiumState.premiumFeature}</h4>
-				<p>Dieses Feature ist nur für Premium-Nutzer verfügbar.</p>
-				<div class="premium-benefits">
-					<div class="benefit">✅ Unbegrenzte E-Rechnungen</div>
-					<div class="benefit">✅ Logo-Upload</div>
-					<div class="benefit">✅ Rechnungsvorlagen</div>
-					<div class="benefit">✅ Kundenverwaltung</div>
-					<div class="benefit">✅ Prioritäts-Support</div>
-				</div>
-				<div class="premium-price">
-					<span class="price">9,99€</span>
-					<span class="period">pro Monat</span>
-				</div>
-			</div>
-			<div class="modal-actions">
-				<button
-					class="btn btn-secondary"
-					on:click={premiumActions.hidePremiumModal}
-				>
-					Später
-				</button>
-				<button class="btn btn-primary">🚀 Premium werden</button>
-			</div>
-		</div>
-	</div>
+	<PremiumModal
+		featureName={$uiState.premiumFeatureName}
+		bind:show={$uiState.showPremiumModal}
+		on:upgrade={handlePremiumUpgrade}
+		on:close={handleClose}
+	/>
 {/if}
 
 <!-- Registration Modal -->

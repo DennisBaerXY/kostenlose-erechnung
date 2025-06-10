@@ -86,6 +86,8 @@
 						<label>Einheit</label>
 						<select
 							value={item.unit}
+							required
+							aria-label="Einheit auswählen"
 							on:change={(e) => updateItem(index, "unit", e.target.value)}
 						>
 							<option value="Stück">Stück</option>
@@ -114,6 +116,7 @@
 					<div class="form-group">
 						<label>MwSt. (%)</label>
 						<select
+							required
 							value={item.taxRate}
 							on:change={(e) =>
 								updateItem(index, "taxRate", parseInt(e.target.value))}

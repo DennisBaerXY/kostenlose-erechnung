@@ -118,14 +118,10 @@
 	</div>
 
 	<div class="wizard-footer">
-		<button class="btn btn-secondary" on:click={prevStep} disabled={!canGoPrev}>
-			← Zurück
-		</button>
+		<button class="btn btn-secondary" on:click={prevStep}> ← Zurück </button>
 
 		{#if currentStep < WIZARD_STEPS.length}
-			<button class="btn btn-primary" on:click={nextStep} disabled={!canGoNext}>
-				Weiter →
-			</button>
+			<button class="btn btn-primary" on:click={nextStep}> Weiter → </button>
 		{/if}
 	</div>
 </div>

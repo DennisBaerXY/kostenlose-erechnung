@@ -1,20 +1,51 @@
-// src/lib/utils/invoice-generator.js - XRechnung 3.0.1 konforme Generierung
+// src/lib/utils/invoice-generator.js - FIXED TAX CALCULATIONS
 
-import {
-	total,
-	subtotal,
-	taxGroups,
-	calculateInvoiceTotals
-} from "$lib/stores/invoice.js";
+function calculateTotals(invoiceData) {
+	const items = invoiceData.items || [];
+
+	// Calculate subtotal (net amount)
+	const subtotal = items.reduce(
+		(sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
+		0
+	);
+
+	// Group by tax rate and calculate tax amounts
+	const taxGroups = items.reduce((groups, item) => {
+		const rate = item.taxRate || 19;
+		if (!groups[rate]) {
+			groups[rate] = { rate, base: 0, tax: 0 };
+		}
+		const itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+		groups[rate].base += itemTotal;
+		groups[rate].tax += (itemTotal * rate) / 100;
+		return groups;
+	}, {});
+
+	// Calculate total tax amount
+	const taxAmount = Object.values(taxGroups).reduce(
+		(sum, group) => sum + group.tax,
+		0
+	);
+
+	// Calculate grand total
+	const total = subtotal + taxAmount;
+
+	return {
+		subtotal,
+		taxGroups,
+		taxAmount,
+		total
+	};
+}
 
 /**
  * Generiert XRechnung 3.0.2 konforme XML in CII-Syntax
  * (Standard für ZUGFeRD und XRechnung)
  */
 export function generateXRechnungCII(invoiceData) {
-	const { subtotal, taxGroups, total } = calculateInvoiceTotals();
+	const { subtotal, taxGroups, taxAmount, total } =
+		calculateTotals(invoiceData);
 
-	// Der Anfang der XML-Datei bis <rsm:SupplyChainTradeTransaction> bleibt gleich...
 	const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice 
     xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -24,7 +55,7 @@ export function generateXRechnungCII(invoiceData) {
     xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
  
   <rsm:ExchangedDocumentContext>
-  <ram:BusinessProcessSpecifiedDocumentContextParameter>
+    <ram:BusinessProcessSpecifiedDocumentContextParameter>
         <ram:ID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</ram:ID>
     </ram:BusinessProcessSpecifiedDocumentContextParameter>
     <ram:GuidelineSpecifiedDocumentContextParameter>
@@ -39,10 +70,10 @@ export function generateXRechnungCII(invoiceData) {
       <udt:DateTimeString format="102">${formatDate(invoiceData.metadata.date)}</udt:DateTimeString>
     </ram:IssueDateTime>
     ${
-			invoiceData.notes?.introText
+			invoiceData.metadata.introductionText
 				? `<ram:IncludedNote>
-    <ram:Content>${escapeXml(invoiceData.notes.introText)}</ram:Content>
-    </ram:IncludedNote>`
+        <ram:Content>${escapeXml(invoiceData.metadata.introductionText)}</ram:Content>
+      </ram:IncludedNote>`
 				: ""
 		}
   </rsm:ExchangedDocument>
@@ -55,14 +86,14 @@ export function generateXRechnungCII(invoiceData) {
       
       <ram:SellerTradeParty>
         <ram:Name>${escapeXml(invoiceData.sender.name)}</ram:Name>
-		 <ram:DefinedTradeContact>
-            <ram:PersonName>${escapeXml(invoiceData.sender.contactName || invoiceData.sender.name)}</ram:PersonName>
-            <ram:TelephoneUniversalCommunication>
-                <ram:CompleteNumber>${escapeXml(invoiceData.sender.phone || "N/A")}</ram:CompleteNumber>
-            </ram:TelephoneUniversalCommunication>
-            <ram:EmailURIUniversalCommunication>
-                <ram:URIID>${escapeXml(invoiceData.sender.email || "N/A")}</ram:URIID>
-            </ram:EmailURIUniversalCommunication>
+        <ram:DefinedTradeContact>
+          <ram:PersonName>${escapeXml(invoiceData.sender.contactName || invoiceData.sender.name)}</ram:PersonName>
+          <ram:TelephoneUniversalCommunication>
+            <ram:CompleteNumber>${escapeXml(invoiceData.sender.phone || "N/A")}</ram:CompleteNumber>
+          </ram:TelephoneUniversalCommunication>
+          <ram:EmailURIUniversalCommunication>
+            <ram:URIID>${escapeXml(invoiceData.sender.email || "N/A")}</ram:URIID>
+          </ram:EmailURIUniversalCommunication>
         </ram:DefinedTradeContact>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>${escapeXml(invoiceData.sender.zip)}</ram:PostcodeCode>
@@ -73,25 +104,24 @@ export function generateXRechnungCII(invoiceData) {
         ${
 					invoiceData.sender.email
 						? `<ram:URIUniversalCommunication>
-                    <ram:URIID schemeID="EM">${escapeXml(invoiceData.sender.email)}</ram:URIID>
-                </ram:URIUniversalCommunication>`
+            <ram:URIID schemeID="EM">${escapeXml(invoiceData.sender.email)}</ram:URIID>
+          </ram:URIUniversalCommunication>`
 						: ""
 				}
         ${
 					invoiceData.sender.taxId
 						? `<ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="FC">${escapeXml(invoiceData.sender.taxId)}</ram:ID>
-        </ram:SpecifiedTaxRegistration>`
+            <ram:ID schemeID="FC">${escapeXml(invoiceData.sender.taxId)}</ram:ID>
+          </ram:SpecifiedTaxRegistration>`
 						: ""
 				}
         ${
 					invoiceData.sender.ustId
 						? `<ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="VA">${escapeXml(invoiceData.sender.ustId)}</ram:ID>
-        </ram:SpecifiedTaxRegistration>`
+            <ram:ID schemeID="VA">${escapeXml(invoiceData.sender.ustId)}</ram:ID>
+          </ram:SpecifiedTaxRegistration>`
 						: ""
 				}
-       
       </ram:SellerTradeParty>
       
       <ram:BuyerTradeParty>
@@ -105,8 +135,8 @@ export function generateXRechnungCII(invoiceData) {
         ${
 					invoiceData.recipient.email
 						? `<ram:URIUniversalCommunication>
-          <ram:URIID schemeID="EM">${escapeXml(invoiceData.recipient.email)}</ram:URIID>
-        </ram:URIUniversalCommunication>`
+            <ram:URIID schemeID="EM">${escapeXml(invoiceData.recipient.email)}</ram:URIID>
+          </ram:URIUniversalCommunication>`
 						: ""
 				}
       </ram:BuyerTradeParty>
@@ -116,10 +146,10 @@ export function generateXRechnungCII(invoiceData) {
       ${
 				invoiceData.metadata.deliveryDate
 					? `<ram:ActualDeliverySupplyChainEvent>
-      <ram:OccurrenceDateTime>
-        <udt:DateTimeString format="102">${formatDate(invoiceData.metadata.deliveryDate)}</udt:DateTimeString>
-      </ram:OccurrenceDateTime>
-    </ram:ActualDeliverySupplyChainEvent>`
+        <ram:OccurrenceDateTime>
+          <udt:DateTimeString format="102">${formatDate(invoiceData.metadata.deliveryDate)}</udt:DateTimeString>
+        </ram:OccurrenceDateTime>
+      </ram:ActualDeliverySupplyChainEvent>`
 					: ""
 			}
     </ram:ApplicableHeaderTradeDelivery>
@@ -128,58 +158,54 @@ export function generateXRechnungCII(invoiceData) {
       <ram:InvoiceCurrencyCode>${invoiceData.metadata.currency || "EUR"}</ram:InvoiceCurrencyCode>
 
       <ram:SpecifiedTradeSettlementPaymentMeans>
-          <ram:TypeCode>${invoiceData.sender.iban ? "58" : "1"}</ram:TypeCode>
-          ${
-						invoiceData.sender.iban
-							? `<ram:PayeePartyCreditorFinancialAccount>
-                      <ram:IBANID>${escapeXml(invoiceData.sender.iban)}</ram:IBANID>
-                  </ram:PayeePartyCreditorFinancialAccount>
-                  ${
-										invoiceData.sender.bic
-											? `<ram:PayeeSpecifiedCreditorFinancialInstitution>
-                              <ram:BICID>${escapeXml(invoiceData.sender.bic)}</ram:BICID>
-                          </ram:PayeeSpecifiedCreditorFinancialInstitution>`
-											: ""
-									}`
-							: ""
-					}
+        <ram:TypeCode>${invoiceData.sender.bankDetails?.iban ? "58" : "1"}</ram:TypeCode>
+        ${
+					invoiceData.sender.bankDetails?.iban
+						? `<ram:PayeePartyCreditorFinancialAccount>
+              <ram:IBANID>${escapeXml(invoiceData.sender.bankDetails.iban)}</ram:IBANID>
+            </ram:PayeePartyCreditorFinancialAccount>
+            ${
+							invoiceData.sender.bankDetails?.bic
+								? `<ram:PayeeSpecifiedCreditorFinancialInstitution>
+                  <ram:BICID>${escapeXml(invoiceData.sender.bankDetails.bic)}</ram:BICID>
+                </ram:PayeeSpecifiedCreditorFinancialInstitution>`
+								: ""
+						}`
+						: ""
+				}
       </ram:SpecifiedTradeSettlementPaymentMeans>
 
       ${Object.values(taxGroups)
 				.map(
 					(group) => `<ram:ApplicableTradeTax>
-                  <ram:CalculatedAmount>${group.tax.toFixed(2)}</ram:CalculatedAmount>
-                  <ram:TypeCode>VAT</ram:TypeCode>
-                  <ram:BasisAmount>${group.base.toFixed(2)}</ram:BasisAmount>
-                  <ram:CategoryCode>${group.rate === 0 ? "Z" : "S"}</ram:CategoryCode>
-                  <ram:RateApplicablePercent>${group.rate}</ram:RateApplicablePercent>
-              </ram:ApplicableTradeTax>`
+            <ram:CalculatedAmount>${group.tax.toFixed(2)}</ram:CalculatedAmount>
+            <ram:TypeCode>VAT</ram:TypeCode>
+            <ram:BasisAmount>${group.base.toFixed(2)}</ram:BasisAmount>
+            <ram:CategoryCode>${group.rate === 0 ? "Z" : "S"}</ram:CategoryCode>
+            <ram:RateApplicablePercent>${group.rate}</ram:RateApplicablePercent>
+          </ram:ApplicableTradeTax>`
 				)
 				.join("\n      ")}
 
       <ram:SpecifiedTradePaymentTerms>
-          <ram:Description>${getPaymentTermsText(invoiceData.metadata)}</ram:Description>
-          ${
-						invoiceData.metadata.dueDate
-							? `<ram:DueDateDateTime>
-                      <udt:DateTimeString format="102">${formatDate(invoiceData.metadata.dueDate)}</udt:DateTimeString>
-                  </ram:DueDateDateTime>`
-							: ""
-					}
+        <ram:Description>${getPaymentTermsText(invoiceData.metadata)}</ram:Description>
+        ${
+					invoiceData.metadata.dueDate
+						? `<ram:DueDateDateTime>
+              <udt:DateTimeString format="102">${formatDate(invoiceData.metadata.dueDate)}</udt:DateTimeString>
+            </ram:DueDateDateTime>`
+						: ""
+				}
       </ram:SpecifiedTradePaymentTerms>
 
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-          <ram:LineTotalAmount>${subtotal.toFixed(2)}</ram:LineTotalAmount>
-          <ram:TaxBasisTotalAmount>${subtotal.toFixed(2)}</ram:TaxBasisTotalAmount>
-          <ram:TaxTotalAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${Object.values(
-						taxGroups
-					)
-						.reduce((sum, g) => sum + g.tax, 0)
-						.toFixed(2)}</ram:TaxTotalAmount>
-          <ram:GrandTotalAmount>${total.toFixed(2)}</ram:GrandTotalAmount>
-          <ram:DuePayableAmount>${total.toFixed(2)}</ram:DuePayableAmount>
+        <ram:LineTotalAmount>${subtotal.toFixed(2)}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>${subtotal.toFixed(2)}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${taxAmount.toFixed(2)}</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>${total.toFixed(2)}</ram:GrandTotalAmount>
+        <ram:DuePayableAmount>${total.toFixed(2)}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-      </ram:ApplicableHeaderTradeSettlement>
+    </ram:ApplicableHeaderTradeSettlement>
     
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
@@ -192,7 +218,8 @@ export function generateXRechnungCII(invoiceData) {
  * (Alternative Syntax, kompatibel mit PEPPOL)
  */
 export function generateXRechnungUBL(invoiceData) {
-	const { subtotal, taxGroups, total } = calculateInvoiceTotals();
+	const { subtotal, taxGroups, taxAmount, total } =
+		calculateTotals(invoiceData);
 
 	const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ubl:Invoice 
@@ -206,9 +233,11 @@ export function generateXRechnungUBL(invoiceData) {
   <cbc:IssueDate>${invoiceData.metadata.date}</cbc:IssueDate>
   ${invoiceData.metadata.dueDate ? `<cbc:DueDate>${invoiceData.metadata.dueDate}</cbc:DueDate>` : ""}
   <cbc:InvoiceTypeCode>${invoiceData.metadata.invoiceTypeCode || "380"}</cbc:InvoiceTypeCode>
-  ${invoiceData.notes?.introText ? `<cbc:Note>${escapeXml(invoiceData.notes.introText)}</cbc:Note>` : ""}
+  ${invoiceData.metadata.introductionText ? `<cbc:Note>${escapeXml(invoiceData.metadata.introductionText)}</cbc:Note>` : ""}
   <cbc:DocumentCurrencyCode>${invoiceData.metadata.currency || "EUR"}</cbc:DocumentCurrencyCode>
-  <cbc:BuyerReference>${escapeXml(invoiceData.recipient.reference || "N/A")}</cbc:BuyerReference> <cac:AccountingSupplierParty>
+  <cbc:BuyerReference>${escapeXml(invoiceData.recipient.reference || "N/A")}</cbc:BuyerReference>
+ 
+  <cac:AccountingSupplierParty>
     <cac:Party>
       ${invoiceData.sender.email ? `<cbc:EndpointID schemeID="EM">${escapeXml(invoiceData.sender.email)}</cbc:EndpointID>` : ""}
       <cac:PartyName>
@@ -225,21 +254,21 @@ export function generateXRechnungUBL(invoiceData) {
       ${
 				invoiceData.sender.taxId
 					? `<cac:PartyTaxScheme>
-        <cbc:CompanyID>${escapeXml(invoiceData.sender.taxId)}</cbc:CompanyID>
-        <cac:TaxScheme>
-          <cbc:ID>FC</cbc:ID>
-        </cac:TaxScheme>
-      </cac:PartyTaxScheme>`
+          <cbc:CompanyID>${escapeXml(invoiceData.sender.taxId)}</cbc:CompanyID>
+          <cac:TaxScheme>
+            <cbc:ID>FC</cbc:ID>
+          </cac:TaxScheme>
+        </cac:PartyTaxScheme>`
 					: ""
 			}
       ${
 				invoiceData.sender.ustId
 					? `<cac:PartyTaxScheme>
-        <cbc:CompanyID>${escapeXml(invoiceData.sender.ustId)}</cbc:CompanyID>
-        <cac:TaxScheme>
-          <cbc:ID>VAT</cbc:ID>
-        </cac:TaxScheme>
-      </cac:PartyTaxScheme>`
+          <cbc:CompanyID>${escapeXml(invoiceData.sender.ustId)}</cbc:CompanyID>
+          <cac:TaxScheme>
+            <cbc:ID>VAT</cbc:ID>
+          </cac:TaxScheme>
+        </cac:PartyTaxScheme>`
 					: ""
 			}
       <cac:PartyLegalEntity>
@@ -276,25 +305,25 @@ export function generateXRechnungUBL(invoiceData) {
   ${
 		invoiceData.metadata.deliveryDate
 			? `<cac:Delivery>
-    <cbc:ActualDeliveryDate>${invoiceData.metadata.deliveryDate}</cbc:ActualDeliveryDate>
-  </cac:Delivery>`
+      <cbc:ActualDeliveryDate>${invoiceData.metadata.deliveryDate}</cbc:ActualDeliveryDate>
+    </cac:Delivery>`
 			: ""
 	}
  
   <cac:PaymentMeans>
-    <cbc:PaymentMeansCode>${invoiceData.sender.iban ? "58" : "1"}</cbc:PaymentMeansCode>
+    <cbc:PaymentMeansCode>${invoiceData.sender.bankDetails?.iban ? "58" : "1"}</cbc:PaymentMeansCode>
     ${
-			invoiceData.sender.iban
+			invoiceData.sender.bankDetails?.iban
 				? `<cac:PayeeFinancialAccount>
-      <cbc:ID>${escapeXml(invoiceData.sender.iban)}</cbc:ID>
-      ${
-				invoiceData.sender.bic
-					? `<cac:FinancialInstitutionBranch>
-        <cbc:ID>${escapeXml(invoiceData.sender.bic)}</cbc:ID>
-      </cac:FinancialInstitutionBranch>`
-					: ""
-			}
-    </cac:PayeeFinancialAccount>`
+        <cbc:ID>${escapeXml(invoiceData.sender.bankDetails.iban)}</cbc:ID>
+        ${
+					invoiceData.sender.bankDetails?.bic
+						? `<cac:FinancialInstitutionBranch>
+            <cbc:ID>${escapeXml(invoiceData.sender.bankDetails.bic)}</cbc:ID>
+          </cac:FinancialInstitutionBranch>`
+						: ""
+				}
+      </cac:PayeeFinancialAccount>`
 				: ""
 		}
   </cac:PaymentMeans>
@@ -302,30 +331,26 @@ export function generateXRechnungUBL(invoiceData) {
   ${
 		invoiceData.metadata.paymentTerms
 			? `<cac:PaymentTerms>
-    <cbc:Note>${getPaymentTermsText(invoiceData.metadata)}</cbc:Note>
-  </cac:PaymentTerms>`
+      <cbc:Note>${getPaymentTermsText(invoiceData.metadata)}</cbc:Note>
+    </cac:PaymentTerms>`
 			: ""
 	}
  
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${Object.values(
-			taxGroups
-		)
-			.reduce((sum, g) => sum + g.tax, 0)
-			.toFixed(2)}</cbc:TaxAmount>
+    <cbc:TaxAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${taxAmount.toFixed(2)}</cbc:TaxAmount>
     ${Object.values(taxGroups)
 			.map(
 				(group) => `<cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${group.base.toFixed(2)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${group.tax.toFixed(2)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cbc:ID>${group.rate === 0 ? "Z" : "S"}</cbc:ID>
-        <cbc:Percent>${group.rate}</cbc:Percent>
-        <cac:TaxScheme>
-          <cbc:ID>VAT</cbc:ID>
-        </cac:TaxScheme>
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>`
+        <cbc:TaxableAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${group.base.toFixed(2)}</cbc:TaxableAmount>
+        <cbc:TaxAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${group.tax.toFixed(2)}</cbc:TaxAmount>
+        <cac:TaxCategory>
+          <cbc:ID>${group.rate === 0 ? "Z" : "S"}</cbc:ID>
+          <cbc:Percent>${group.rate}</cbc:Percent>
+          <cac:TaxScheme>
+            <cbc:ID>VAT</cbc:ID>
+          </cac:TaxScheme>
+        </cac:TaxCategory>
+      </cac:TaxSubtotal>`
 			)
 			.join("\n    ")}
   </cac:TaxTotal>
@@ -337,7 +362,7 @@ export function generateXRechnungUBL(invoiceData) {
     <cbc:PayableAmount currencyID="${invoiceData.metadata.currency || "EUR"}">${total.toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
  
-  ${invoiceData.items.map((item, index) => generateUBLLineItem(item, index + 1)).join("\n ")}
+  ${invoiceData.items.map((item, index) => generateUBLLineItem(item, index + 1)).join("\n  ")}
 </ubl:Invoice>`;
 
 	return xml;
@@ -345,8 +370,7 @@ export function generateXRechnungUBL(invoiceData) {
 
 // Helper functions
 function generateCIILineItem(item, lineNumber) {
-	const lineTotal =
-		item.quantity * item.unitPrice * (1 - (item.discount || 0) / 100);
+	const lineTotal = (item.quantity || 0) * (item.unitPrice || 0);
 
 	return `<ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument>
@@ -355,23 +379,24 @@ function generateCIILineItem(item, lineNumber) {
       
       <ram:SpecifiedTradeProduct>
         <ram:Name>${escapeXml(item.description)}</ram:Name>
+        ${item.articleNumber ? `<ram:SellerAssignedID>${escapeXml(item.articleNumber)}</ram:SellerAssignedID>` : ""}
       </ram:SpecifiedTradeProduct>
       
       <ram:SpecifiedLineTradeAgreement>
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>${item.unitPrice.toFixed(2)}</ram:ChargeAmount>
+          <ram:ChargeAmount>${(item.unitPrice || 0).toFixed(2)}</ram:ChargeAmount>
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       
       <ram:SpecifiedLineTradeDelivery>
-        <ram:BilledQuantity unitCode="${getUnitCode(item.unit)}">${item.quantity}</ram:BilledQuantity>
+        <ram:BilledQuantity unitCode="${getUnitCode(item.unit)}">${item.quantity || 0}</ram:BilledQuantity>
       </ram:SpecifiedLineTradeDelivery>
       
       <ram:SpecifiedLineTradeSettlement>
         <ram:ApplicableTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
-          <ram:CategoryCode>${item.taxRate === 0 ? "Z" : "S"}</ram:CategoryCode>
-          <ram:RateApplicablePercent>${item.taxRate}</ram:RateApplicablePercent>
+          <ram:CategoryCode>${(item.taxRate || 0) === 0 ? "Z" : "S"}</ram:CategoryCode>
+          <ram:RateApplicablePercent>${item.taxRate || 0}</ram:RateApplicablePercent>
         </ram:ApplicableTradeTax>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
           <ram:LineTotalAmount>${lineTotal.toFixed(2)}</ram:LineTotalAmount>
@@ -381,25 +406,25 @@ function generateCIILineItem(item, lineNumber) {
 }
 
 function generateUBLLineItem(item, lineNumber) {
-	const lineTotal =
-		item.quantity * item.unitPrice * (1 - (item.discount || 0) / 100);
+	const lineTotal = (item.quantity || 0) * (item.unitPrice || 0);
 
 	return `<cac:InvoiceLine>
     <cbc:ID>${lineNumber}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="${getUnitCode(item.unit)}">${item.quantity}</cbc:InvoicedQuantity>
+    <cbc:InvoicedQuantity unitCode="${getUnitCode(item.unit)}">${item.quantity || 0}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="EUR">${lineTotal.toFixed(2)}</cbc:LineExtensionAmount>
     <cac:Item>
       <cbc:Name>${escapeXml(item.description)}</cbc:Name>
+      ${item.articleNumber ? `<cac:SellersItemIdentification><cbc:ID>${escapeXml(item.articleNumber)}</cbc:ID></cac:SellersItemIdentification>` : ""}
       <cac:ClassifiedTaxCategory>
-        <cbc:ID>${item.taxRate === 0 ? "Z" : "S"}</cbc:ID>
-        <cbc:Percent>${item.taxRate}</cbc:Percent>
+        <cbc:ID>${(item.taxRate || 0) === 0 ? "Z" : "S"}</cbc:ID>
+        <cbc:Percent>${item.taxRate || 0}</cbc:Percent>
         <cac:TaxScheme>
           <cbc:ID>VAT</cbc:ID>
         </cac:TaxScheme>
       </cac:ClassifiedTaxCategory>
     </cac:Item>
     <cac:Price>
-      <cbc:PriceAmount currencyID="EUR">${item.unitPrice.toFixed(2)}</cbc:PriceAmount>
+      <cbc:PriceAmount currencyID="EUR">${(item.unitPrice || 0).toFixed(2)}</cbc:PriceAmount>
       <cbc:BaseQuantity unitCode="${getUnitCode(item.unit)}">1</cbc:BaseQuantity>
     </cac:Price>
   </cac:InvoiceLine>`;
@@ -428,7 +453,7 @@ function getPaymentTermsText(metadata) {
 		immediate: "Zahlbar sofort ohne Abzug"
 	};
 
-	if (metadata.paymentTerms === "custom" && metadata.customPaymentTerms) {
+	if (metadata.customPaymentTerms) {
 		return metadata.customPaymentTerms;
 	}
 
@@ -480,24 +505,15 @@ export function validateXMLStructure(xmlString) {
 
 		// Prüfe grundlegende XRechnung-Struktur
 		const root = xmlDoc.documentElement;
-		if (!root || root.tagName !== "rsm:CrossIndustryInvoice") {
+		const isCII = root && root.tagName === "rsm:CrossIndustryInvoice";
+		const isUBL = root && root.tagName === "ubl:Invoice";
+
+		if (!isCII && !isUBL) {
 			return {
 				isValid: false,
-				error: "Kein gültiges CrossIndustryInvoice Root-Element"
+				error:
+					"Kein gültiges CrossIndustryInvoice oder UBL Invoice Root-Element"
 			};
-		}
-
-		// Prüfe erforderliche Elemente
-		const requiredElements = [
-			"rsm:ExchangedDocumentContext",
-			"rsm:ExchangedDocument",
-			"rsm:SupplyChainTradeTransaction"
-		];
-
-		for (const element of requiredElements) {
-			if (!xmlDoc.querySelector(element)) {
-				return { isValid: false, error: `Fehlendes Element: ${element}` };
-			}
 		}
 
 		return { isValid: true };
@@ -513,7 +529,7 @@ export function downloadXRechnung(invoiceData, syntax = "CII") {
 	try {
 		const xml = generateXRechnung(invoiceData, syntax);
 
-		// // Validiere XML vor Download
+		// Optional: Validiere XML vor Download
 		// const validation = validateXMLStructure(xml);
 		// if (!validation.isValid) {
 		// 	throw new Error(`XML-Validierung fehlgeschlagen: ${validation.error}`);

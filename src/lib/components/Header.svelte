@@ -87,7 +87,13 @@
 					Neue Rechnung →
 				</a>
 			{:else}
-				<a href="/login" class="btn nav-cta"> Anmelden </a>
+				<a
+					href="/login"
+					class="nav-link"
+					class:active={$page.url.pathname === "/login"}
+				>
+					Anmelden
+				</a>
 				<a href="/erstellen" class="btn btn-primary nav-cta">
 					Rechnung erstellen →
 				</a>
@@ -163,10 +169,6 @@
 	.nav-link:hover::after,
 	.nav-link.active::after {
 		width: 100%;
-	}
-
-	.nav-link.active {
-		color: var(--primary-dark);
 	}
 
 	.invoice-counter {

@@ -58,7 +58,7 @@
 		<div class="stat-card">
 			<div class="stat-icon">📅</div>
 			<div class="stat-content">
-				<div class="stat-value">{formatDate(stats.lastInvoiceDate)}</div>
+				<div class="stat-value">{stats.lastInvoiceDate}</div>
 				<div class="stat-label">Letzte Rechnung</div>
 			</div>
 		</div>

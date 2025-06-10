@@ -113,17 +113,17 @@
 					<section class="invoice-meta-block">
 						<strong>Rechnungs-Nr.:</strong>
 						{data.metadata.invoiceNumber || "RE-00001"}<br />
+						<strong>Datum:</strong>
+						{formatDate(data.metadata.date)}<br />
+						{#if data.metadata.deliveryDate}
+							<strong>Lieferdatum:</strong>
+							{formatDate(data.metadata.deliveryDate)} <br />
+						{/if}
 						{#if data.recipient.customerNumber}
 							<strong>Kunden-Nr.:</strong> {data.recipient.customerNumber}<br />
 						{/if}
 						{#if data.recipient.reference}
 							<strong>Referenz:</strong> {data.recipient.reference}<br />
-						{/if}
-						<strong>Datum:</strong>
-						{formatDate(data.metadata.date)}<br />
-						{#if data.metadata.deliveryDate}
-							<strong>Lieferdatum:</strong>
-							{formatDate(data.metadata.deliveryDate)}
 						{/if}
 					</section>
 
@@ -363,6 +363,8 @@
 
 	/* Meta-Informationen */
 	.invoice-meta-block {
+		width: 100%;
+
 		text-align: right;
 		margin-bottom: 10mm;
 		line-height: 1.6;

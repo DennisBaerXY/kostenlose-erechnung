@@ -101,15 +101,25 @@ function validateItems(items) {
 		if (!item.description?.trim()) {
 			errors.push(`Position ${index + 1}: Beschreibung fehlt`);
 		}
-
-		if (!item.quantity || item.quantity <= 0) {
+		if (item.quantity <= 0) {
 			errors.push(`Position ${index + 1}: Menge muss größer als 0 sein`);
 		}
-
-		if (item.unitPrice === undefined || item.unitPrice < 0) {
-			errors.push(`Position ${index + 1}: Preis darf nicht negativ sein`);
+		if (item.price <= 0) {
+			errors.push(`Position ${index + 1}: Preis muss größer als 0 sein`);
 		}
 	});
+	if (items.some((item) => item.quantity <= 0)) {
+		errors.push("Alle Positionen müssen eine Menge größer als 0 haben");
+	}
+	if (items.some((item) => item.price <= 0)) {
+		errors.push("Alle Positionen müssen einen Preis größer als 0 haben");
+	}
+	if (items.some((item) => !item.description?.trim())) {
+		errors.push("Alle Positionen müssen eine Beschreibung haben");
+	}
+	if (items.some((item) => item.quantity < 0)) {
+		errors.push("Menge darf nicht negativ sein");
+	}
 
 	return errors;
 }

@@ -26,7 +26,7 @@ export const uiState = writable({
 
 // Premium state
 export const premiumState = writable({
-	userTier: "premium", // 'free' | 'premium'
+	userTier: "free", // 'free' | 'premium'
 	monthlyInvoices: 0,
 	premiumFeature: ""
 });
@@ -40,8 +40,9 @@ export const canGoNext = derived(
 );
 
 export const canGoPrev = derived(
-	currentStep,
-	($currentStep) => $currentStep > 1
+	[currentStep, uiState],
+	([$currentStep, $uiState]) =>
+		$currentStep > 1 && $uiState.validationErrors.length === 0
 );
 
 // Navigation actions
