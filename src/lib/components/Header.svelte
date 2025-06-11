@@ -1,7 +1,6 @@
 <script>
 	import { page } from "$app/stores";
 	import { authStore, isAuthenticated, isLoading } from "$lib/stores/authStore";
-	import { auth } from "$lib/api/auth";
 
 	// Local UI state
 	let isMenuOpen = false;
@@ -16,22 +15,8 @@
 		isMenuOpen = !isMenuOpen;
 	}
 
-	export async function load() {
-		// This function runs before the page component is rendered.
-
-		// On the server, we can't check auth state, so we wait for the client.
-		if (!browser) {
-			return;
-		}
-
-		// Wait until the auth store has finished initializing.
-		// We use a simple loop here to wait for the isLoading flag.
-		while (get(isLoading)) {
-			await new Promise((r) => setTimeout(r, 50)); // wait 50ms
-		}
-
-		// After loading, check if the user is authenticated.
-		const userIsAuthenticated = get(isAuthenticated);
+	async function handleLogout() {
+		await authStore.logout();
 	}
 </script>
 
@@ -42,81 +27,83 @@
 			kostenlose-erechnung.de
 		</a>
 
-		<div class="nav-links" class:open={isMenuOpen}>
-			{#if $isAuthenticated}
-				<!-- Logged-in Navigation -->
-				<a
-					href="/dashboard"
-					class="nav-link"
-					class:active={$page.url.pathname.startsWith("/dashboard")}
-				>
-					Dashboard
-				</a>
-			{/if}
-
-			<a
-				href="/auslesen"
-				class="nav-link"
-				class:active={$page.url.pathname === "/auslesen"}
-			>
-				Rechnung prüfen
-			</a>
-
-			{#if $isAuthenticated && $authStore}
-				<!-- User Menu (for logged-in users) -->
-				<div class="user-menu">
-					<button
-						class="user-button"
-						on:click={() => (showDropdown = !showDropdown)}
-						aria-haspopup="true"
-						aria-expanded={showDropdown}
+		{#if !$isLoading}
+			<div class="nav-links" class:open={isMenuOpen}>
+				{#if $isAuthenticated}
+					<!-- Logged-in Navigation -->
+					<a
+						href="/dashboard"
+						class="nav-link"
+						class:active={$page.url.pathname.startsWith("/dashboard")}
 					>
-						<span class="user-icon">👤</span>
-						<span class="user-email">{$authStore.email}</span>
-						<span class="dropdown-arrow" class:open={showDropdown}>▼</span>
-					</button>
+						Dashboard
+					</a>
+				{/if}
 
-					{#if showDropdown}
-						<div class="dropdown-menu">
-							<a href="/dashboard" class="dropdown-item">
-								<span>📊</span> Dashboard
-							</a>
-							<a href="/dashboard/invoices" class="dropdown-item">
-								<span>📄</span> Meine Rechnungen
-							</a>
-							<a href="/dashboard/settings" class="dropdown-item">
-								<span>⚙️</span> Einstellungen
-							</a>
-							{#if $authStore.subscriptionStatus !== "premium"}
-								<a href="/pricing" class="dropdown-item premium">
-									<span>⭐</span> Premium werden
-								</a>
-							{/if}
-							<hr />
-							<button class="dropdown-item logout" on:click={auth.logout}>
-								<span>🚪</span> Abmelden
-							</button>
-						</div>
-					{/if}
-				</div>
-
-				<a href="/erstellen" class="btn btn-primary nav-cta">
-					Neue Rechnung →
-				</a>
-			{:else}
-				<!-- Logged-out Navigation -->
 				<a
-					href="/login"
+					href="/auslesen"
 					class="nav-link"
-					class:active={$page.url.pathname === "/login"}
+					class:active={$page.url.pathname === "/auslesen"}
 				>
-					Anmelden
+					Rechnung prüfen
 				</a>
-				<a href="/erstellen" class="btn btn-primary nav-cta">
-					Rechnung erstellen →
-				</a>
-			{/if}
-		</div>
+
+				{#if $isAuthenticated && $authStore}
+					<!-- User Menu (for logged-in users) -->
+					<div class="user-menu">
+						<button
+							class="user-button"
+							on:click={() => (showDropdown = !showDropdown)}
+							aria-haspopup="true"
+							aria-expanded={showDropdown}
+						>
+							<span class="user-icon">👤</span>
+							<span class="user-email">{$authStore.email}</span>
+							<span class="dropdown-arrow" class:open={showDropdown}>▼</span>
+						</button>
+
+						{#if showDropdown}
+							<div class="dropdown-menu">
+								<a href="/dashboard" class="dropdown-item">
+									<span>📊</span> Dashboard
+								</a>
+								<a href="/dashboard/invoices" class="dropdown-item">
+									<span>📄</span> Meine Rechnungen
+								</a>
+								<a href="/dashboard/settings" class="dropdown-item">
+									<span>⚙️</span> Einstellungen
+								</a>
+								{#if $authStore.subscriptionStatus !== "premium"}
+									<a href="/preise" class="dropdown-item premium">
+										<span>⭐</span> Premium werden
+									</a>
+								{/if}
+								<hr />
+								<button class="dropdown-item logout" on:click={handleLogout}>
+									<span>🚪</span> Abmelden
+								</button>
+							</div>
+						{/if}
+					</div>
+
+					<a href="/erstellen" class="btn btn-primary nav-cta">
+						Neue Rechnung →
+					</a>
+				{:else}
+					<!-- Logged-out Navigation -->
+					<a
+						href="/login"
+						class="nav-link"
+						class:active={$page.url.pathname === "/login"}
+					>
+						Anmelden
+					</a>
+					<a href="/erstellen" class="btn btn-primary nav-cta">
+						Rechnung erstellen →
+					</a>
+				{/if}
+			</div>
+		{/if}
 
 		<button
 			class="menu-toggle"

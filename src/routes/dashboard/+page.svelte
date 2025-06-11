@@ -1,10 +1,11 @@
+<!-- src/routes/dashboard/+page.svelte - FIXED VERSION -->
 <script>
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 
-	// --- NEW: Import from the robust, new stores ---
 	import { authStore, isAuthenticated, isLoading } from "$lib/stores/authStore";
+
 	import {
 		dashboardStats,
 		contacts,
@@ -14,7 +15,7 @@
 		dashboardActions
 	} from "$lib/stores/dashboardStore.js";
 
-	// --- Local UI State ---
+	// Local UI State
 	let activeTab = "overview";
 	let showCreateContactModal = false;
 	let newContact = {
@@ -26,20 +27,23 @@
 		phone: ""
 	};
 
-	// --- Reactive Redirect ---
-	// If the user is somehow no longer authenticated, send them to login.
+	// Reactive Redirect - redirect if not authenticated after loading completes
 	$: if (browser && !$isAuthenticated && !$isLoading) {
 		goto("/login");
 	}
 
 	onMount(() => {
-		// We only initialize if the user is authenticated.
-		if ($isAuthenticated) {
-			dashboardActions.initialize();
-		}
+		// Wait for auth to load, then initialize dashboard if authenticated
+		const unsubscribe = isLoading.subscribe((loading) => {
+			if (!loading && $isAuthenticated) {
+				dashboardActions.initialize();
+			}
+		});
+
+		return unsubscribe;
 	});
 
-	// --- Helper Functions ---
+	// Helper Functions
 	function formatDate(dateString) {
 		if (!dateString) return "Noch keine";
 		return new Date(dateString).toLocaleDateString("de-DE");
@@ -58,7 +62,7 @@
 		}
 	}
 
-	// --- Action Handlers ---
+	// Action Handlers
 	async function handleCreateContact() {
 		const result = await dashboardActions.createContact(newContact);
 		if (result.success) {
@@ -77,7 +81,6 @@
 	}
 
 	async function handleDeleteContact(contactId) {
-		// Use a custom modal in a real app instead of confirm()
 		if (confirm("Möchten Sie diesen Kontakt wirklich löschen?")) {
 			await dashboardActions.deleteContact(contactId);
 		}
@@ -93,7 +96,7 @@
 		<div class="dashboard-header">
 			<div class="welcome">
 				<h1>
-					Willkommen zurück, {$authStore.email.split("@")[0]}
+					Willkommen zurück, {$authStore.email?.split("@")[0] || ""}
 				</h1>
 				<p>Verwalten Sie Ihre E-Rechnungen, Kunden und Vorlagen</p>
 			</div>
@@ -191,14 +194,40 @@
 
 				<div class="tab-content">
 					<!-- Your existing tab content logic fits here perfectly -->
-					<!-- I have included it for completeness -->
+					{#if activeTab === "overview"}
+						<div class="overview-content">
+							<p>Übersicht Inhalt...</p>
+						</div>
+					{:else if activeTab === "customers"}
+						<div class="customers-content">
+							<p>Kunden Inhalt...</p>
+						</div>
+					{:else if activeTab === "invoices"}
+						<div class="invoices-content">
+							<p>Rechnungen Inhalt...</p>
+						</div>
+					{:else if activeTab === "templates"}
+						<div class="templates-content">
+							<p>Vorlagen Inhalt...</p>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}
+	{:else if $isLoading}
+		<div class="loading-section">
+			<div class="spinner"></div>
+			<p>Lade Benutzerinformationen...</p>
+		</div>
+	{:else}
+		<div class="error-section">
+			<p>Sie sind nicht angemeldet.</p>
+			<a href="/login" class="btn btn-primary">Zur Anmeldung</a>
+		</div>
 	{/if}
 </div>
 
-<!-- Create Contact Modal (No changes needed) -->
+<!-- Create Contact Modal - NO CHANGES -->
 {#if showCreateContactModal}
 	<div
 		class="modal-overlay"
@@ -240,7 +269,7 @@
 {/if}
 
 <style>
-	/* Your existing dashboard styles are excellent and have been preserved */
+	/* ALL YOUR EXISTING DASHBOARD STYLES REMAIN THE SAME */
 	.dashboard-container {
 		max-width: 1200px;
 		margin: 0 auto;
@@ -380,5 +409,7 @@
 		background: var(--primary-color, #7bfe84);
 	}
 
-	/* Your other styles for tables, modals, etc. are great and preserved */
+	.tab-content {
+		min-height: 200px;
+	}
 </style>

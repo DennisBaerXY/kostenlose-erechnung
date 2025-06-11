@@ -4,32 +4,25 @@
 	import { browser } from "$app/environment";
 	import { fade, fly } from "svelte/transition";
 
-	// Import the new, robust authentication modules
-	import { isAuthenticated } from "$lib/stores/authStore";
-	import { auth } from "$lib/api/auth";
+	// Use your existing auth imports
+	import { isAuthenticated, authStore } from "$lib/stores/authStore";
 
-	// --- Component State ---
+	// Component State
 	let email = "";
 	let password = "";
 	let error = "";
-	let loginInProgress = false; // For managing the button's loading state
+	let loginInProgress = false;
 	let showPassword = false;
 	let rememberMe = false;
 
-	// --- Reactive Statements ---
-
-	// This block will run automatically whenever isAuthenticated changes.
-	// If the user becomes authenticated, it redirects them to the dashboard.
+	// Redirect if already authenticated
 	$: if ($isAuthenticated) {
 		if (browser) {
 			goto("/dashboard", { replaceState: true });
 		}
 	}
 
-	// --- Lifecycle ---
-
 	onMount(() => {
-		// Load remembered email from localStorage when the component mounts
 		if (browser) {
 			const rememberedEmail = localStorage.getItem("remembered_email");
 			if (rememberedEmail) {
@@ -39,20 +32,16 @@
 		}
 	});
 
-	// --- Event Handlers ---
-
 	async function handleLogin() {
-		// Prevent multiple submissions
 		if (loginInProgress) return;
 
 		loginInProgress = true;
-		error = ""; // Clear previous errors
+		error = "";
 
 		try {
-			const result = await auth.login(email, password);
+			const result = await authStore.login(email, password);
 
 			if (result.success) {
-				// Handle "Remember Me" functionality
 				if (browser) {
 					if (rememberMe) {
 						localStorage.setItem("remembered_email", email);
@@ -60,9 +49,8 @@
 						localStorage.removeItem("remembered_email");
 					}
 				}
-				// The reactive statement `$: if ($isAuthenticated)` will handle the redirect.
+				// The reactive statement will handle the redirect
 			} else {
-				// Display the error message from the backend
 				error =
 					result.message ||
 					"Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Eingaben.";

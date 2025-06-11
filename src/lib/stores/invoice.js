@@ -121,7 +121,7 @@ export function addInvoiceItem() {
 			quantity: 1,
 			unit: "Stück",
 			unitPrice: 0,
-			taxRate: 19  // Default to 19% MwSt
+			taxRate: 19 // Default to 19% MwSt
 		});
 		return data;
 	});

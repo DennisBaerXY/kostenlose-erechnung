@@ -1,5 +1,5 @@
 import { session } from "$lib/stores/session";
-import { auth } from "$lib/api/auth";
+import { authStore } from "$lib/stores/authStore";
 import { goto } from "$app/navigation";
 import { browser } from "$app/environment";
 
@@ -7,11 +7,7 @@ const API_BASE_URL =
 	import.meta.env.VITE_API_URL || "https://your-api-gateway-url.com";
 
 /**
- * A wrapper for the fetch API that handles authentication and token refreshing.
- * @param {string} endpoint The API endpoint to call (e.g., '/dashboard/stats').
- * @param {RequestInit} options The options for the fetch call.
- * @param {boolean} isRetry A flag to prevent infinite refresh loops.
- * @returns {Promise<Response>} The raw fetch response.
+ * Enhanced fetch wrapper that handles token refresh automatically
  */
 async function fetchWithAuth(endpoint, options = {}, isRetry = false) {
 	const tokens = session.getTokens();
@@ -20,8 +16,8 @@ async function fetchWithAuth(endpoint, options = {}, isRetry = false) {
 		...options.headers
 	};
 
-	if (tokens?.accessToken) {
-		headers["Authorization"] = `Bearer ${tokens.accessToken}`;
+	if (tokens?.AccessToken) {
+		headers["Authorization"] = `Bearer ${tokens.AccessToken}`;
 	}
 
 	const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -29,31 +25,29 @@ async function fetchWithAuth(endpoint, options = {}, isRetry = false) {
 		headers
 	});
 
-	// If unauthorized and it's not a retry attempt, try to refresh the token.
+	// Handle token expiration
 	if (response.status === 401 && !isRetry) {
 		try {
 			console.log("Access token expired. Attempting to refresh...");
-			const refreshResult = await auth.refreshToken();
 
-			if (refreshResult.success) {
+			// Try to refresh token using the auth store
+			const refreshResult = await authStore.refreshToken();
+
+			if (refreshResult && refreshResult.success) {
 				console.log(
 					"Token refreshed successfully. Retrying original request..."
 				);
-				// Retry the original request with the new token.
+				// Retry the original request with the new token
 				return fetchWithAuth(endpoint, options, true);
 			} else {
-				// Refresh failed, force logout.
+				// Refresh failed, force logout
 				console.error("Token refresh failed. Logging out.");
-				auth.logout();
-				if (browser) goto("/login");
-				// Return the original failed response to stop the chain.
+				await authStore.logout();
 				return response;
 			}
 		} catch (error) {
 			console.error("An error occurred during token refresh:", error);
-			auth.logout();
-			if (browser) goto("/login");
-			// Re-throw the error to be caught by the calling function.
+			await authStore.logout();
 			throw error;
 		}
 	}
@@ -62,15 +56,16 @@ async function fetchWithAuth(endpoint, options = {}, isRetry = false) {
 }
 
 /**
- * A simplified API client for making authenticated requests.
+ * Your existing API client with enhanced error handling
  */
 export const apiClient = {
-	get: async (endpoint) => {
+	async get(endpoint) {
 		const response = await fetchWithAuth(endpoint, { method: "GET" });
 		if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
 		return response.json();
 	},
-	post: async (endpoint, body) => {
+
+	async post(endpoint, body) {
 		const response = await fetchWithAuth(endpoint, {
 			method: "POST",
 			body: JSON.stringify(body)
@@ -78,7 +73,8 @@ export const apiClient = {
 		if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
 		return response.json();
 	},
-	put: async (endpoint, body) => {
+
+	async put(endpoint, body) {
 		const response = await fetchWithAuth(endpoint, {
 			method: "PUT",
 			body: JSON.stringify(body)
@@ -86,7 +82,8 @@ export const apiClient = {
 		if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
 		return response.json();
 	},
-	delete: async (endpoint) => {
+
+	async delete(endpoint) {
 		const response = await fetchWithAuth(endpoint, { method: "DELETE" });
 		if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
 		return response.json();

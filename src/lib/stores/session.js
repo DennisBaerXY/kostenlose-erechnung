@@ -18,7 +18,7 @@ export const session = {
 		// Ensure we preserve the refresh token if the new tokens object doesn't have one
 		const existingTokens = session.getTokens();
 		const newTokens = {
-			refreshToken: existingTokens?.refreshToken,
+			RefreshToken: existingTokens?.RefreshToken,
 			...tokens
 		};
 		localStorage.setItem(TOKENS_KEY, JSON.stringify(newTokens));

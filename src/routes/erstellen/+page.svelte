@@ -9,7 +9,7 @@
 		generateInvoiceNumber,
 		calculateDueDate
 	} from "$lib/stores/invoice.js";
-	import { getInvoiceCount, incrementInvoiceCount } from "$lib/stores/auth.js";
+
 	import { downloadXRechnung } from "$lib/utils/invoice-generator.js";
 	import { validateStep } from "$lib/utils/invoice-validation.js";
 
@@ -55,6 +55,13 @@
 		uiActions.setValidationErrors(validation.errors);
 		isFormValid = validation.isValid;
 	}
+
+	function incrementInvoiceCount() {
+		premiumState.update((state) => ({
+			...state,
+			monthlyInvoices: (state.monthlyInvoices || 0) + 1
+		}));
+	}
 	// Initialize data on mount
 	onMount(() => {
 		wizardActions.resetWizard();
@@ -84,12 +91,6 @@
 		if ($invoiceData.items.length === 0) {
 			addInvoiceItem();
 		}
-
-		// Update premium state
-		premiumState.update((state) => ({
-			...state,
-			monthlyInvoices: getInvoiceCount()
-		}));
 	});
 
 	// Data update handlers - CORRECT Store Updates
@@ -150,7 +151,9 @@
 				if ($invoiceData.items[index]) {
 					// Ensure tax rate is a number
 					const processedValue = field === "taxRate" ? Number(value) : value;
-					updateInvoiceItem($invoiceData.items[index].id, { [field]: processedValue });
+					updateInvoiceItem($invoiceData.items[index].id, {
+						[field]: processedValue
+					});
 				}
 				validateCurrentStep();
 				break;
