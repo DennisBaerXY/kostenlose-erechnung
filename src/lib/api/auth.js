@@ -2,11 +2,12 @@ const API_BASE_URL =
 	import.meta.env.VITE_API_URL || "https://your-api-gateway-url.com";
 
 class AuthAPI {
-	async register(email, password, givenName, familyName) {
+	async register(email, password) {
+		console.log("API URL:", API_BASE_URL);
 		const response = await fetch(`${API_BASE_URL}/auth/register`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email, password, givenName, familyName })
+			body: JSON.stringify({ email, password })
 		});
 
 		return await response.json();
@@ -20,6 +21,7 @@ class AuthAPI {
 		});
 
 		const result = await response.json();
+		console.log("Login response:", result);
 
 		if (result.success) {
 			// Store tokens in localStorage (or secure storage)

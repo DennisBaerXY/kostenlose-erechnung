@@ -39,7 +39,10 @@ const config = {
 				"style-src": ["self", "unsafe-inline"],
 				"img-src": ["self", "data:", "https:"],
 				"font-src": ["self"],
-				"connect-src": ["self"],
+				"connect-src": [
+					"self",
+					"https://z836skrf8a.execute-api.eu-central-1.amazonaws.com"
+				],
 				"frame-ancestors": ["none"],
 				"form-action": ["self"],
 				"base-uri": ["self"]

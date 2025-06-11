@@ -148,6 +148,33 @@
 		gap: 2rem;
 	}
 
+	:global(.nav-link) {
+		text-decoration: none;
+		padding: 0.5rem 1rem;
+		border-radius: var(--radius);
+		transition:
+			background 0.3s ease,
+			color 0.3s ease;
+	}
+	:global(.nav-link) {
+		&:hover {
+			background: var(--bg-light);
+			color: var(--text-dark);
+		}
+	}
+
+	:global(.nav-link.active) {
+		background: var(--bg-light);
+		color: var(--primary-color);
+		font-weight: 600;
+	}
+
+	:global(.nav-link.active:hover) {
+		background: var(--bg-light);
+		color: var(--primary-color);
+		font-weight: 600;
+	}
+
 	.nav-link {
 		color: var(--text-dark);
 		font-weight: 500;

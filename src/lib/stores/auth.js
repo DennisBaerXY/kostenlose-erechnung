@@ -1,5 +1,7 @@
+// src/lib/stores/auth.js (Updated)
 import { writable, derived } from "svelte/store";
 import { browser } from "$app/environment";
+import { authAPI } from "$lib/api/auth.js";
 
 // User authentication state
 export const currentUser = writable(null);
@@ -33,15 +35,27 @@ export async function initializeAuth() {
 	}
 }
 
-export async function signUpUser(email, password, givenName, familyName) {
-	return await authAPI.register(email, password, givenName, familyName);
+export async function signUpUser(email, password) {
+	const result = await authAPI.register(email, password);
+	return result;
 }
 
 export async function signInUser(email, password) {
 	const result = await authAPI.login(email, password);
 
 	if (result.success) {
+		console.log("User signed in successfully:", result.user);
 		currentUser.set(result.user);
+
+		// Initialize dashboard data after successful login
+		if (browser) {
+			try {
+				const { dashboardActions } = await import("./dashboard.js");
+				dashboardActions.initialize();
+			} catch (error) {
+				console.warn("Dashboard initialization failed:", error);
+			}
+		}
 	}
 
 	return result;
@@ -50,6 +64,17 @@ export async function signInUser(email, password) {
 export async function signOutUser() {
 	await authAPI.logout();
 	currentUser.set(null);
+
+	// Clear dashboard data on logout
+	if (browser) {
+		try {
+			const { dashboardActions } = await import("./dashboard.js");
+			dashboardActions.reset();
+		} catch (error) {
+			console.warn("Dashboard reset failed:", error);
+		}
+	}
+
 	return { success: true };
 }
 
