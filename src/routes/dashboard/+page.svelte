@@ -95,9 +95,7 @@
 	{#if $isAuthenticated && $authStore}
 		<div class="dashboard-header">
 			<div class="welcome">
-				<h1>
-					Willkommen zurück, {$authStore.email?.split("@")[0] || ""}
-				</h1>
+				<h1>Willkommen zurück 💚</h1>
 				<p>Verwalten Sie Ihre E-Rechnungen, Kunden und Vorlagen</p>
 			</div>
 			<div class="actions">

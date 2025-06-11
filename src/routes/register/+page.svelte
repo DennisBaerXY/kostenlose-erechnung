@@ -1,48 +1,67 @@
-<!-- src/routes/register/+page.svelte -->
 <script>
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { fade, fly } from "svelte/transition";
-	import { signUpUser, isAuthenticated } from "$lib/stores/auth.js";
 
+	// Import the auth functions from the more detailed authStore
+	import {
+		signUpUser,
+		confirmSignUpUser,
+		resendConfirmationCode,
+		isAuthenticated
+	} from "$lib/stores/authStore.js";
+
+	// State variables merged from the modal and the original page
 	let email = "";
 	let password = "";
 	let confirmPassword = "";
-
 	let acceptTerms = false;
 	let loading = false;
 	let error = "";
-	let success = false;
+
+	// Multi-step registration state
+	let registrationStep = "form"; // "form" | "success" | "confirmation" | "complete"
+
+	// Confirmation-specific state
+	let confirmationCode = "";
+	let confirmationLoading = false;
+	let confirmationError = "";
+
+	// Password visibility toggles
 	let showPassword = false;
 	let showConfirmPassword = false;
+
+	// --- Validation ---
+	// Combined validation logic similar to the modal
+	$: passwordsMatch = password === confirmPassword;
+	$: hasMinLength = password.length >= 8;
+	$: hasUpperCase = /[A-Z]/.test(password);
+	$: hasLowerCase = /[a-z]/.test(password);
+	$: hasNumber = /[0-9]/.test(password);
+	$: hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+	$: isPasswordStrong =
+		hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
+	$: isFormValid =
+		email &&
+		password &&
+		confirmPassword &&
+		passwordsMatch &&
+		acceptTerms &&
+		isPasswordStrong;
 
 	// Redirect if already authenticated
 	onMount(() => {
 		if (browser && $isAuthenticated) {
-			goto("/dashboard");
+			goto("/dashboard", { replaceState: true });
 		}
 	});
 
+	// --- Main Registration Handler ---
 	async function handleRegister() {
-		// Validation
-		if (!email || !password || !confirmPassword) {
-			error = "Bitte füllen Sie alle Pflichtfelder aus.";
-			return;
-		}
-
-		if (password !== confirmPassword) {
-			error = "Die Passwörter stimmen nicht überein.";
-			return;
-		}
-
-		if (password.length < 8) {
-			error = "Das Passwort muss mindestens 8 Zeichen lang sein.";
-			return;
-		}
-
-		if (!acceptTerms) {
-			error = "Bitte akzeptieren Sie die Nutzungsbedingungen.";
+		if (!isFormValid) {
+			error =
+				"Bitte füllen Sie alle Felder korrekt aus und stellen Sie sicher, dass das Passwort den Anforderungen entspricht.";
 			return;
 		}
 
@@ -53,15 +72,28 @@
 			const result = await signUpUser(email, password);
 
 			if (result.success) {
-				success = true;
-				// Redirect to confirmation page or show success message
+				// Registration successful, show success state
+				registrationStep = "success";
+
+				// Auto-transition to the confirmation code input after 3 seconds
 				setTimeout(() => {
-					goto(`/confirm-email?email=${encodeURIComponent(email)}`);
-				}, 2000);
+					registrationStep = "confirmation";
+				}, 3000);
 			} else {
-				error =
-					result.message ||
-					"Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.";
+				// Handle specific Cognito errors from the modal logic
+				if (result.message?.includes("UsernameExistsException")) {
+					error = "Ein Konto mit dieser E-Mail-Adresse existiert bereits.";
+				} else if (result.message?.includes("InvalidPasswordException")) {
+					error =
+						"Das Passwort entspricht nicht den Sicherheitsanforderungen. Bitte verwenden Sie mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen.";
+				} else if (result.message?.includes("InvalidParameterException")) {
+					error =
+						"Ungültige E-Mail-Adresse. Bitte überprüfen Sie Ihre Eingabe.";
+				} else {
+					error =
+						result.message ||
+						"Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.";
+				}
 			}
 		} catch (err) {
 			console.error("Registration error:", err);
@@ -72,14 +104,82 @@
 		}
 	}
 
-	function handleKeydown(event) {
-		if (event.key === "Enter") {
-			handleRegister();
+	// --- Confirmation Code Handler ---
+	async function handleConfirmation() {
+		if (!confirmationCode || confirmationCode.length !== 6) {
+			confirmationError =
+				"Bitte geben Sie den 6-stelligen Bestätigungscode ein.";
+			return;
+		}
+
+		confirmationLoading = true;
+		confirmationError = "";
+
+		try {
+			const result = await confirmSignUpUser(email, confirmationCode);
+
+			if (result.success) {
+				// Registration and confirmation complete
+				registrationStep = "complete";
+
+				// Redirect to login page with a success indicator after 2 seconds
+				setTimeout(() => {
+					goto("/login?registered=true");
+				}, 2000);
+			} else {
+				// Handle specific confirmation errors
+				if (result.message?.includes("CodeMismatchException")) {
+					confirmationError =
+						"Ungültiger Bestätigungscode. Bitte überprüfen Sie den Code.";
+				} else if (result.message?.includes("ExpiredCodeException")) {
+					confirmationError =
+						"Der Code ist abgelaufen. Bitte fordern Sie einen neuen an.";
+				} else if (result.message?.includes("NotAuthorizedException")) {
+					confirmationError =
+						"Zu viele Versuche. Bitte warten Sie einen Moment.";
+				} else {
+					confirmationError =
+						result.message ||
+						"Bestätigung fehlgeschlagen. Bitte versuchen Sie es erneut.";
+				}
+			}
+		} catch (err) {
+			console.error("Confirmation error:", err);
+			confirmationError = "Ein unerwarteter Fehler ist aufgetreten.";
+		} finally {
+			confirmationLoading = false;
 		}
 	}
 
+	// --- Resend Code Handler ---
+	async function handleResendCode() {
+		confirmationLoading = true;
+		confirmationError = "";
+		try {
+			const result = await resendConfirmationCode(email);
+			if (result.success) {
+				// Provide temporary feedback
+				confirmationError = "Ein neuer Code wurde gesendet!";
+				setTimeout(() => {
+					if (confirmationError === "Ein neuer Code wurde gesendet!") {
+						confirmationError = "";
+					}
+				}, 3000);
+			} else {
+				confirmationError = result.message || "Fehler beim Senden des Codes.";
+			}
+		} catch (err) {
+			console.error("Resend error:", err);
+			confirmationError = "Fehler beim Senden des Codes.";
+		} finally {
+			confirmationLoading = false;
+		}
+	}
+
+	// --- Helper Functions ---
 	function clearError() {
 		error = "";
+		confirmationError = "";
 	}
 
 	function togglePasswordVisibility(field) {
@@ -88,31 +188,6 @@
 		} else {
 			showConfirmPassword = !showConfirmPassword;
 		}
-	}
-
-	// Password strength validation
-	$: passwordStrength = getPasswordStrength(password);
-
-	function getPasswordStrength(pass) {
-		if (!pass) return { score: 0, text: "", color: "" };
-
-		let score = 0;
-		if (pass.length >= 8) score++;
-		if (/[a-z]/.test(pass)) score++;
-		if (/[A-Z]/.test(pass)) score++;
-		if (/[0-9]/.test(pass)) score++;
-		if (/[^A-Za-z0-9]/.test(pass)) score++;
-
-		const levels = [
-			{ score: 0, text: "", color: "" },
-			{ score: 1, text: "Sehr schwach", color: "#dc3545" },
-			{ score: 2, text: "Schwach", color: "#fd7e14" },
-			{ score: 3, text: "Mittel", color: "#ffc107" },
-			{ score: 4, text: "Stark", color: "#28a745" },
-			{ score: 5, text: "Sehr stark", color: "#28a745" }
-		];
-
-		return levels[score] || levels[0];
 	}
 </script>
 
@@ -126,14 +201,12 @@
 
 <div class="register-container">
 	<div class="register-wrapper">
-		<!-- Left side - Benefits -->
 		<div class="benefits-section">
 			<div class="benefits-content">
 				<div class="benefits-header">
 					<h2>Warum kostenlose-erechnung.de?</h2>
 					<p>Professionelle E-Rechnungen für alle, gemacht in Deutschland ❤️</p>
 				</div>
-
 				<div class="benefits-list">
 					<div class="benefit-item">
 						<div class="benefit-icon">🆓</div>
@@ -145,7 +218,6 @@
 							</p>
 						</div>
 					</div>
-
 					<div class="benefit-item">
 						<div class="benefit-icon">⚡</div>
 						<div class="benefit-text">
@@ -153,7 +225,6 @@
 							<p>Erstellen Sie Ihre erste E-Rechnung in unter 5 Minuten</p>
 						</div>
 					</div>
-
 					<div class="benefit-item">
 						<div class="benefit-icon">✅</div>
 						<div class="benefit-text">
@@ -161,7 +232,6 @@
 							<p>XRechnung und ZUGFeRD - alle Standards für B2B und B2G</p>
 						</div>
 					</div>
-
 					<div class="benefit-item">
 						<div class="benefit-icon">🔒</div>
 						<div class="benefit-text">
@@ -169,7 +239,6 @@
 							<p>Deutsche Server, höchste Sicherheitsstandards</p>
 						</div>
 					</div>
-
 					<div class="benefit-item">
 						<div class="benefit-icon">💼</div>
 						<div class="benefit-text">
@@ -177,7 +246,6 @@
 							<p>Saubere, normkonforme Rechnungen für Ihr Business</p>
 						</div>
 					</div>
-
 					<div class="benefit-item">
 						<div class="benefit-icon">📱</div>
 						<div class="benefit-text">
@@ -186,7 +254,6 @@
 						</div>
 					</div>
 				</div>
-
 				<div class="trust-indicators">
 					<div class="trust-item">
 						<span class="trust-badge">🇩🇪 Made in Germany</span>
@@ -200,170 +267,236 @@
 				</div>
 			</div>
 		</div>
-		<!-- Right side - Form -->
+
 		<div class="form-section">
 			<div class="form-container">
-				{#if success}
+				{#if registrationStep === "form"}
+					<div
+						in:fade={{ duration: 300, delay: 300 }}
+						out:fade={{ duration: 200 }}
+					>
+						<div class="form-header">
+							<h2>Kostenloses Konto erstellen</h2>
+							<p>
+								Starten Sie in wenigen Minuten mit professionellen E-Rechnungen
+							</p>
+						</div>
+
+						{#if error}
+							<div
+								class="error-message"
+								in:fly={{ y: -10, duration: 300 }}
+								on:click={clearError}
+							>
+								<span class="error-icon">⚠️</span>
+								<span>{error}</span>
+								<button class="error-close" aria-label="Fehlermeldung schließen"
+									>✕</button
+								>
+							</div>
+						{/if}
+
+						<form
+							on:submit|preventDefault={handleRegister}
+							class="register-form"
+						>
+							<div class="input-group">
+								<label for="email">E-Mail-Adresse *</label>
+								<input
+									id="email"
+									type="email"
+									bind:value={email}
+									on:input={clearError}
+									placeholder="max@mustermann.de"
+									required
+									autocomplete="email"
+									class="input"
+									disabled={loading}
+								/>
+							</div>
+
+							<div class="input-group">
+								<label for="password">Passwort *</label>
+								<div class="password-input-wrapper">
+									<input
+										id="password"
+										type={showPassword ? "text" : "password"}
+										bind:value={password}
+										on:input={clearError}
+										placeholder="Mindestens 8 Zeichen"
+										required
+										autocomplete="new-password"
+										class="input password-input"
+										disabled={loading}
+									/>
+									<button
+										type="button"
+										class="password-toggle"
+										on:click={() => togglePasswordVisibility("password")}
+										aria-label={showPassword
+											? "Passwort verbergen"
+											: "Passwort anzeigen"}
+									>
+										{showPassword ? "👁️" : "👁️‍🗨️"}
+									</button>
+								</div>
+								<small class="password-hint"
+									>Muss Groß- & Kleinbuchstaben, Zahlen und Sonderzeichen
+									enthalten.</small
+								>
+							</div>
+
+							<div class="input-group">
+								<label for="confirmPassword">Passwort bestätigen *</label>
+								<div class="password-input-wrapper">
+									<input
+										id="confirmPassword"
+										type={showConfirmPassword ? "text" : "password"}
+										bind:value={confirmPassword}
+										on:input={clearError}
+										placeholder="Passwort wiederholen"
+										required
+										autocomplete="new-password"
+										class="input password-input"
+										class:error={confirmPassword && !passwordsMatch}
+										disabled={loading}
+									/>
+									<button
+										type="button"
+										class="password-toggle"
+										on:click={() => togglePasswordVisibility("confirm")}
+										aria-label={showConfirmPassword
+											? "Passwort verbergen"
+											: "Passwort anzeigen"}
+									>
+										{showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+									</button>
+								</div>
+								{#if confirmPassword && !passwordsMatch}
+									<small class="validation-error"
+										>Passwörter stimmen nicht überein</small
+									>
+								{/if}
+							</div>
+
+							<div class="terms-section">
+								<label class="checkbox-label">
+									<input
+										type="checkbox"
+										bind:checked={acceptTerms}
+										class="checkbox"
+										required
+										disabled={loading}
+									/>
+									<span class="checkbox-text"
+										>Ich akzeptiere die <a href="/agb" target="_blank">AGB</a>
+										und die
+										<a href="/datenschutz" target="_blank"
+											>Datenschutzerklärung</a
+										></span
+									>
+								</label>
+							</div>
+
+							<button
+								type="submit"
+								class="register-button"
+								disabled={loading || !isFormValid}
+							>
+								{#if loading}
+									<div class="spinner"></div>
+									<span>Konto wird erstellt...</span>
+								{:else}
+									<span>Kostenloses Konto erstellen</span>
+								{/if}
+							</button>
+						</form>
+
+						<div class="form-footer">
+							<p>Bereits ein Konto?</p>
+							<a href="/login" class="login-link"> Jetzt anmelden </a>
+						</div>
+					</div>
+				{:else if registrationStep === "success"}
 					<div class="success-state" in:fade={{ duration: 300 }}>
 						<div class="success-icon">✅</div>
 						<h2>Registrierung erfolgreich!</h2>
 						<p>
-							Wir haben Ihnen eine Bestätigungs-E-Mail gesendet. Bitte prüfen
-							Sie Ihr Postfach.
+							Wir haben Ihnen eine E-Mail mit einem Bestätigungscode gesendet.
 						</p>
 						<div class="loading-dots">
-							<span></span>
-							<span></span>
-							<span></span>
+							<span></span><span></span><span></span>
 						</div>
 					</div>
-				{:else}
-					<div class="form-header">
-						<h2>Kostenloses Konto erstellen</h2>
-						<p>
-							Starten Sie in wenigen Minuten mit professionellen E-Rechnungen
-						</p>
-					</div>
-
-					{#if error}
-						<div
-							class="error-message"
-							in:fly={{ y: -10, duration: 300 }}
-							on:click={clearError}
+				{:else if registrationStep === "confirmation"}
+					<div class="confirmation-step" in:fade={{ duration: 300 }}>
+						<div class="confirmation-header">
+							<div class="email-icon">📧</div>
+							<h2>E-Mail bestätigen</h2>
+							<p>
+								Wir haben einen 6-stelligen Code an <strong>{email}</strong> gesendet.
+							</p>
+						</div>
+						<form
+							on:submit|preventDefault={handleConfirmation}
+							class="confirmation-form"
 						>
-							<span class="error-icon">⚠️</span>
-							<span>{error}</span>
-							<button class="error-close" aria-label="Fehlermeldung schließen"
-								>✕</button
-							>
-						</div>
-					{/if}
-
-					<form on:submit|preventDefault={handleRegister} class="register-form">
-						<div class="input-group">
-							<label for="email">E-Mail-Adresse *</label>
-							<input
-								id="email"
-								type="email"
-								bind:value={email}
-								on:keydown={handleKeydown}
-								on:input={clearError}
-								placeholder="max@mustermann.de"
-								required
-								autocomplete="email"
-								class="input"
-							/>
-						</div>
-
-						<div class="input-group">
-							<label for="password">Passwort *</label>
-							<div class="password-input-wrapper">
+							<div class="input-group">
+								<label for="confirmation-code">Bestätigungscode</label>
 								<input
-									id="password"
-									type={showPassword ? "text" : "password"}
-									bind:value={password}
-									on:keydown={handleKeydown}
-									on:input={clearError}
-									placeholder="Mindestens 8 Zeichen"
+									id="confirmation-code"
+									type="text"
+									bind:value={confirmationCode}
+									placeholder="123456"
+									maxlength="6"
+									pattern="[0-9]{6}"
 									required
-									autocomplete="new-password"
-									class="input password-input"
+									class="input code-input"
+									disabled={confirmationLoading}
 								/>
-								<button
-									type="button"
-									class="password-toggle"
-									on:click={() => togglePasswordVisibility("password")}
-									aria-label={showPassword
-										? "Passwort verbergen"
-										: "Passwort anzeigen"}
-								>
-									{showPassword ? "👁️" : "👁️‍🗨️"}
-								</button>
 							</div>
-							{#if password && passwordStrength.score > 0}
+
+							{#if confirmationError}
 								<div
-									class="password-strength"
-									style="color: {passwordStrength.color}"
+									class="error-message small"
+									in:fly={{ y: -10, duration: 200 }}
 								>
-									<div class="strength-bar">
-										<div
-											class="strength-fill"
-											style="width: {passwordStrength.score *
-												20}%; background: {passwordStrength.color}"
-										></div>
-									</div>
-									<span class="strength-text">{passwordStrength.text}</span>
+									{confirmationError}
 								</div>
 							{/if}
+
+							<button
+								type="submit"
+								class="register-button"
+								disabled={confirmationLoading || confirmationCode.length !== 6}
+							>
+								{#if confirmationLoading && !confirmationError}
+									<div class="spinner"></div>
+									<span>Wird bestätigt...</span>
+								{:else}
+									E-Mail bestätigen
+								{/if}
+							</button>
+						</form>
+						<div class="confirmation-footer">
+							<button
+								class="link-btn"
+								on:click={handleResendCode}
+								disabled={confirmationLoading}>Code erneut senden</button
+							>
 						</div>
-
-						<div class="input-group">
-							<label for="confirmPassword">Passwort bestätigen *</label>
-							<div class="password-input-wrapper">
-								<input
-									id="confirmPassword"
-									type={showConfirmPassword ? "text" : "password"}
-									bind:value={confirmPassword}
-									on:keydown={handleKeydown}
-									on:input={clearError}
-									placeholder="Passwort wiederholen"
-									required
-									autocomplete="new-password"
-									class="input password-input"
-									class:error={confirmPassword && password !== confirmPassword}
-								/>
-								<button
-									type="button"
-									class="password-toggle"
-									on:click={() => togglePasswordVisibility("confirm")}
-									aria-label={showConfirmPassword
-										? "Passwort verbergen"
-										: "Passwort anzeigen"}
-								>
-									{showConfirmPassword ? "👁️" : "👁️‍🗨️"}
-								</button>
-							</div>
-							{#if confirmPassword && password !== confirmPassword}
-								<small class="validation-error"
-									>Passwörter stimmen nicht überein</small
-								>
-							{/if}
+					</div>
+				{:else if registrationStep === "complete"}
+					<div class="success-state" in:fade={{ duration: 300 }}>
+						<div class="success-icon-large">🎉</div>
+						<h2>Willkommen!</h2>
+						<p>
+							Ihr Konto wurde erfolgreich erstellt. Sie werden zur Anmeldung
+							weitergeleitet.
+						</p>
+						<div class="loading-dots">
+							<span></span><span></span><span></span>
 						</div>
-
-						<div class="terms-section">
-							<label class="checkbox-label">
-								<input
-									type="checkbox"
-									bind:checked={acceptTerms}
-									class="checkbox"
-									required
-								/>
-								<span class="checkbox-text">
-									Ich akzeptiere die <a href="/agb" target="_blank">AGB</a> und
-									die
-									<a href="/datenschutz" target="_blank">Datenschutzerklärung</a
-									>
-								</span>
-							</label>
-						</div>
-
-						<button
-							type="submit"
-							class="register-button"
-							disabled={loading || !acceptTerms || password !== confirmPassword}
-						>
-							{#if loading}
-								<div class="spinner"></div>
-								<span>Konto wird erstellt...</span>
-							{:else}
-								<span>Kostenloses Konto erstellen</span>
-							{/if}
-						</button>
-					</form>
-
-					<div class="form-footer">
-						<p>Bereits ein Konto?</p>
-						<a href="/login" class="login-link"> Jetzt anmelden </a>
 					</div>
 				{/if}
 			</div>
@@ -372,6 +505,7 @@
 </div>
 
 <style>
+	/* Existing styles from register/+page.svelte */
 	.register-container {
 		min-height: 100vh;
 		display: flex;
@@ -380,7 +514,6 @@
 		padding: 1rem;
 		background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 	}
-
 	.register-wrapper {
 		background: var(--bg-white);
 		border-radius: var(--radius-lg);
@@ -392,85 +525,30 @@
 		min-height: 700px;
 		overflow: hidden;
 	}
-
-	/* Form Section */
 	.form-section {
 		padding: 3rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
-
 	.form-container {
 		width: 100%;
 		max-width: 450px;
 	}
-
 	.form-header {
 		text-align: center;
 		margin-bottom: 2rem;
 	}
-
 	.form-header h2 {
 		font-size: 1.75rem;
 		font-weight: 700;
 		color: var(--text-dark);
 		margin: 0 0 0.5rem 0;
 	}
-
 	.form-header p {
 		color: var(--text-light);
 		margin: 0;
 	}
-
-	.success-state {
-		text-align: center;
-		padding: 2rem 0;
-	}
-
-	.success-icon {
-		font-size: 4rem;
-		margin-bottom: 1rem;
-	}
-
-	.success-state h2 {
-		color: #28a745;
-		margin-bottom: 1rem;
-	}
-
-	.loading-dots {
-		display: flex;
-		justify-content: center;
-		gap: 0.5rem;
-		margin-top: 2rem;
-	}
-
-	.loading-dots span {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--primary-color);
-		animation: bounce 1.4s ease-in-out infinite both;
-	}
-
-	.loading-dots span:nth-child(1) {
-		animation-delay: -0.32s;
-	}
-	.loading-dots span:nth-child(2) {
-		animation-delay: -0.16s;
-	}
-
-	@keyframes bounce {
-		0%,
-		80%,
-		100% {
-			transform: scale(0);
-		}
-		40% {
-			transform: scale(1);
-		}
-	}
-
 	.error-message {
 		background: #f8d7da;
 		border: 1px solid #f5c6cb;
@@ -483,7 +561,10 @@
 		color: #721c24;
 		cursor: pointer;
 	}
-
+	.error-message.small {
+		padding: 0.75rem;
+		font-size: 0.9rem;
+	}
 	.error-close {
 		background: none;
 		border: none;
@@ -492,58 +573,44 @@
 		margin-left: auto;
 		padding: 0.25rem;
 	}
-
 	.register-form {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1.25rem;
 	}
-
-	.name-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
 	.input-group {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
 	}
-
 	.input-group label {
 		font-weight: 500;
 		color: var(--text-dark);
 		font-size: 0.875rem;
 	}
-
 	.input {
+		width: 100%;
 		padding: 0.875rem 1rem;
 		border: 2px solid var(--border-color);
 		border-radius: var(--radius);
 		font-size: 1rem;
 		transition: all 0.3s ease;
 	}
-
 	.input:focus {
 		outline: none;
 		border-color: var(--primary-color);
 		box-shadow: 0 0 0 3px rgba(123, 254, 132, 0.1);
 	}
-
 	.input.error {
 		border-color: #dc3545;
 	}
-
 	.password-input-wrapper {
 		position: relative;
 	}
-
 	.password-input {
 		padding-right: 3rem;
 		width: 100%;
 	}
-
 	.password-toggle {
 		position: absolute;
 		right: 0.75rem;
@@ -554,43 +621,18 @@
 		cursor: pointer;
 		padding: 0.25rem;
 	}
-
-	.password-strength {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-top: 0.5rem;
-	}
-
-	.strength-bar {
-		flex: 1;
-		height: 4px;
-		background: #e9ecef;
-		border-radius: 2px;
-		overflow: hidden;
-	}
-
-	.strength-fill {
-		height: 100%;
-		transition: all 0.3s ease;
-	}
-
-	.strength-text {
+	.password-hint {
 		font-size: 0.75rem;
-		font-weight: 500;
-		min-width: 80px;
+		color: #6c757d;
 	}
-
 	.validation-error {
 		color: #dc3545;
 		font-size: 0.75rem;
 		margin-top: 0.25rem;
 	}
-
 	.terms-section {
-		margin: 0.5rem 0;
+		margin: 0.25rem 0;
 	}
-
 	.checkbox-label {
 		display: flex;
 		align-items: flex-start;
@@ -599,22 +641,18 @@
 		font-size: 0.875rem;
 		line-height: 1.5;
 	}
-
 	.checkbox {
 		accent-color: var(--primary-color);
 		margin-top: 0.25rem;
 		flex-shrink: 0;
 	}
-
 	.checkbox-text a {
 		color: var(--primary-dark);
 		text-decoration: none;
 	}
-
 	.checkbox-text a:hover {
 		text-decoration: underline;
 	}
-
 	.register-button {
 		background: linear-gradient(
 			135deg,
@@ -635,18 +673,15 @@
 		gap: 0.5rem;
 		min-height: 48px;
 	}
-
 	.register-button:hover:not(:disabled) {
 		transform: translateY(-2px);
 		box-shadow: 0 4px 12px rgba(123, 254, 132, 0.3);
 	}
-
 	.register-button:disabled {
 		opacity: 0.7;
 		cursor: not-allowed;
 		transform: none;
 	}
-
 	.spinner {
 		width: 16px;
 		height: 16px;
@@ -655,37 +690,30 @@
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 	}
-
 	@keyframes spin {
 		to {
 			transform: rotate(360deg);
 		}
 	}
-
 	.form-footer {
 		text-align: center;
-		margin-top: 2rem;
+		margin-top: 1.5rem;
 		padding-top: 1.5rem;
 		border-top: 1px solid var(--border-color);
 	}
-
 	.form-footer p {
 		color: var(--text-light);
 		margin: 0 0 0.5rem 0;
 		font-size: 0.875rem;
 	}
-
 	.login-link {
 		color: var(--primary-dark);
 		font-weight: 600;
 		text-decoration: none;
 	}
-
 	.login-link:hover {
 		text-decoration: underline;
 	}
-
-	/* Benefits Section */
 	.benefits-section {
 		background: linear-gradient(135deg, var(--text-dark) 0%, #2a2a2a 100%);
 		color: var(--bg-white);
@@ -694,59 +722,49 @@
 		flex-direction: column;
 		justify-content: center;
 	}
-
 	.benefits-header {
 		margin-bottom: 2rem;
 	}
-
 	.benefits-header h2 {
 		font-size: 1.75rem;
 		font-weight: 700;
 		margin: 0 0 1rem 0;
 	}
-
 	.benefits-header p {
 		opacity: 0.9;
 		margin: 0;
 	}
-
 	.benefits-list {
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
 		margin-bottom: 2rem;
 	}
-
 	.benefit-item {
 		display: flex;
 		align-items: flex-start;
 		gap: 1rem;
 	}
-
 	.benefit-icon {
 		font-size: 1.5rem;
 		flex-shrink: 0;
 	}
-
 	.benefit-text h3 {
 		font-size: 1rem;
 		font-weight: 600;
 		margin: 0 0 0.25rem 0;
 	}
-
 	.benefit-text p {
 		font-size: 0.875rem;
 		opacity: 0.9;
 		margin: 0;
 		line-height: 1.5;
 	}
-
 	.trust-indicators {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.75rem;
 	}
-
 	.trust-badge {
 		background: rgba(123, 254, 132, 0.2);
 		color: var(--primary-color);
@@ -756,47 +774,141 @@
 		font-weight: 500;
 	}
 
-	/* Mobile Responsiveness */
+	/* New styles from RegistrationModal for success/confirmation states */
+	.success-state {
+		text-align: center;
+		padding: 2rem 0;
+	}
+	.success-icon {
+		font-size: 4rem;
+		margin-bottom: 1rem;
+	}
+	.success-icon-large {
+		font-size: 4rem;
+		margin-bottom: 1rem;
+	}
+	.success-state h2 {
+		color: #28a745;
+		margin-bottom: 1rem;
+	}
+	.loading-dots {
+		display: flex;
+		justify-content: center;
+		gap: 0.5rem;
+		margin-top: 2rem;
+	}
+	.loading-dots span {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--primary-color);
+		animation: bounce 1.4s ease-in-out infinite both;
+	}
+	.loading-dots span:nth-child(1) {
+		animation-delay: -0.32s;
+	}
+	.loading-dots span:nth-child(2) {
+		animation-delay: -0.16s;
+	}
+	@keyframes bounce {
+		0%,
+		80%,
+		100% {
+			transform: scale(0);
+		}
+		40% {
+			transform: scale(1);
+		}
+	}
+
+	/* Confirmation Step */
+	.confirmation-step {
+		padding: 2rem 0;
+		text-align: center;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+	.confirmation-header {
+		margin-bottom: 2rem;
+	}
+	.email-icon {
+		font-size: 4rem;
+		margin-bottom: 1rem;
+	}
+	.confirmation-header h2 {
+		font-size: 1.75rem;
+		font-weight: 700;
+		color: #1a1a1a;
+		margin: 0 0 1rem 0;
+	}
+	.confirmation-header p {
+		color: #6c757d;
+		margin: 0;
+		line-height: 1.6;
+	}
+	.confirmation-form {
+		max-width: 300px;
+		margin: 0 auto 1.5rem;
+	}
+	.code-input {
+		text-align: center;
+		font-size: 1.25rem;
+		font-weight: 600;
+		letter-spacing: 0.5rem;
+		font-family: monospace;
+		padding: 0.875rem 0.5rem;
+	}
+	.confirmation-footer {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		align-items: center;
+	}
+	.link-btn {
+		background: none;
+		border: none;
+		color: #6c757d;
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: color 0.2s ease;
+	}
+	.link-btn:hover:not(:disabled) {
+		color: #1a1a1a;
+		text-decoration: underline;
+	}
+	.link-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Responsive adjustments */
 	@media (max-width: 768px) {
 		.register-wrapper {
 			grid-template-columns: 1fr;
 		}
-
 		.benefits-section {
 			order: -1;
 		}
-
 		.benefits-content {
 			text-align: center;
 		}
-
 		.benefit-item {
 			display: flex;
 		}
-
 		.benefit-item .benefit-text {
 			flex: 1;
+			text-align: left;
 		}
-
 		.form-section,
 		.benefits-section {
 			padding: 2rem;
 		}
-
-		.name-row {
-			grid-template-columns: 1fr;
-		}
-
-		.benefits-list {
-			gap: 1rem;
-		}
 	}
-
 	@media (max-width: 480px) {
 		.register-container {
 			padding: 0.5rem;
 		}
-
 		.form-section,
 		.benefits-section {
 			padding: 1.5rem;

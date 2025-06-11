@@ -52,7 +52,6 @@ export const session = {
 		if (!browser) return null;
 		try {
 			const tokens = localStorage.getItem(TOKENS_KEY);
-			console.log("Retrieved tokens from storage:", tokens);
 			return tokens ? JSON.parse(tokens) : null;
 		} catch (error) {
 			console.error("Error reading tokens from storage:", error);
@@ -72,7 +71,6 @@ export const session = {
 
 // --- Token Validation ---
 function isTokenExpired(token) {
-	console.log("Checking token expiration for:", token);
 	if (!token) return true;
 
 	try {
@@ -82,7 +80,6 @@ function isTokenExpired(token) {
 
 		// Check if token expires within next 5 minutes
 
-		console.log("Checking token expiration:", payload.exp, now);
 		return payload.exp && payload.exp < now + 300;
 	} catch (error) {
 		console.error("Error checking token expiration:", error);
@@ -127,30 +124,23 @@ async function initializeAuth() {
 		const user = session.getUser();
 		const tokens = session.getTokens();
 
-		console.log("Initializing Auth", tokens);
-
 		if (user && tokens) {
 			// Check if access token is expired
 			if (isTokenExpired(tokens.AccessToken)) {
-				console.log("Access token expired, attempting refresh...");
-
 				if (tokens.RefreshToken && !isTokenExpired(tokens.RefreshToken)) {
 					const refreshResult = await refreshToken();
 					if (!refreshResult.success) {
 						// Refresh failed, clear session
 						session.clear();
-						console.log("Token refresh failed, session cleared");
 					}
 				} else {
 					// No valid refresh token, clear session
 					session.clear();
-					console.log("No valid refresh token, session cleared");
 				}
 			} else {
 				// Valid session, restore state
 				_user.set(user);
 				_tokens.set(tokens);
-				console.log("Valid session restored");
 			}
 		} else {
 			console.log("No stored session found");
@@ -187,7 +177,6 @@ async function refreshToken() {
 			// Update session with new tokens
 			const user = session.getUser();
 			session.set(user, result.tokens);
-			console.log("Token refreshed successfully");
 			return { success: true };
 		} else {
 			console.error("Token refresh failed:", result.message);

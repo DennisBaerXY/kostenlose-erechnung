@@ -26,7 +26,13 @@
 
 	// Password validation
 	$: passwordsMatch = password === confirmPassword;
-	$: isFormValid = email && password && confirmPassword && passwordsMatch && acceptTerms && password.length >= 8;
+	$: isFormValid =
+		email &&
+		password &&
+		confirmPassword &&
+		passwordsMatch &&
+		acceptTerms &&
+		password.length >= 8;
 
 	async function handleRegister() {
 		if (!isFormValid) {
@@ -43,26 +49,35 @@
 			if (result.success) {
 				// Registration successful - show success state
 				registrationStep = "success";
-				
+
 				// Auto-transition to confirmation after 3 seconds
 				setTimeout(() => {
 					registrationStep = "confirmation";
 				}, 3000);
 			} else {
 				// Handle specific Cognito errors
-				if (result.message?.includes("UsernameExistsException") || result.message?.includes("already exists")) {
-					error = "Ein Konto mit dieser E-Mail-Adresse existiert bereits. Möchten Sie sich stattdessen anmelden?";
+				if (
+					result.message?.includes("UsernameExistsException") ||
+					result.message?.includes("already exists")
+				) {
+					error =
+						"Ein Konto mit dieser E-Mail-Adresse existiert bereits. Möchten Sie sich stattdessen anmelden?";
 				} else if (result.message?.includes("InvalidPasswordException")) {
-					error = "Das Passwort entspricht nicht den Sicherheitsanforderungen. Bitte verwenden Sie mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen.";
+					error =
+						"Das Passwort entspricht nicht den Sicherheitsanforderungen. Bitte verwenden Sie mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen.";
 				} else if (result.message?.includes("InvalidParameterException")) {
-					error = "Ungültige E-Mail-Adresse. Bitte überprüfen Sie Ihre Eingabe.";
+					error =
+						"Ungültige E-Mail-Adresse. Bitte überprüfen Sie Ihre Eingabe.";
 				} else {
-					error = result.message || "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.";
+					error =
+						result.message ||
+						"Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.";
 				}
 			}
 		} catch (err) {
 			console.error("Registration error:", err);
-			error = "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
+			error =
+				"Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
 		} finally {
 			loading = false;
 		}
@@ -70,7 +85,8 @@
 
 	async function handleConfirmation() {
 		if (!confirmationCode || confirmationCode.length !== 6) {
-			confirmationError = "Bitte geben Sie den 6-stelligen Bestätigungscode ein.";
+			confirmationError =
+				"Bitte geben Sie den 6-stelligen Bestätigungscode ein.";
 			return;
 		}
 
@@ -93,31 +109,36 @@
 
 				// Save to localStorage as backup
 				localStorage.setItem("user_backup", JSON.stringify(userData));
-				
+
 				// Dispatch success event
 				dispatch("registered", userData);
-				
+
 				// Show success message and redirect
 				registrationStep = "complete";
 				setTimeout(() => {
 					skipRegistration(); // Close modal
 					goto("/login?registered=true");
 				}, 2000);
-				
 			} else {
 				if (result.message?.includes("CodeMismatchException")) {
-					confirmationError = "Ungültiger Bestätigungscode. Bitte überprüfen Sie den Code aus Ihrer E-Mail.";
+					confirmationError =
+						"Ungültiger Bestätigungscode. Bitte überprüfen Sie den Code aus Ihrer E-Mail.";
 				} else if (result.message?.includes("ExpiredCodeException")) {
-					confirmationError = "Der Bestätigungscode ist abgelaufen. Bitte fordern Sie einen neuen Code an.";
+					confirmationError =
+						"Der Bestätigungscode ist abgelaufen. Bitte fordern Sie einen neuen Code an.";
 				} else if (result.message?.includes("NotAuthorizedException")) {
-					confirmationError = "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.";
+					confirmationError =
+						"Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.";
 				} else {
-					confirmationError = result.message || "Bestätigung fehlgeschlagen. Bitte versuchen Sie es erneut.";
+					confirmationError =
+						result.message ||
+						"Bestätigung fehlgeschlagen. Bitte versuchen Sie es erneut.";
 				}
 			}
 		} catch (err) {
 			console.error("Confirmation error:", err);
-			confirmationError = "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
+			confirmationError =
+				"Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
 		} finally {
 			confirmationLoading = false;
 		}
@@ -125,10 +146,10 @@
 
 	async function resendConfirmationCode() {
 		try {
-			// Import the resend function  
-			const { auth } = await import("$lib/api/auth.js");
+			// Import the resend function
+
 			const result = await auth.resendConfirmation(email);
-			
+
 			if (result.success) {
 				confirmationError = "";
 				// Show success message briefly
@@ -176,7 +197,7 @@
 
 	onMount(() => {
 		transition = true;
-		
+
 		// Pre-fill email if available from localStorage
 		const rememberedEmail = localStorage.getItem("remembered_email");
 		if (rememberedEmail && !email) {
@@ -235,7 +256,8 @@
 						<div class="form-header">
 							<h3>Nie wieder Daten eingeben</h3>
 							<p>
-								Erstellen Sie ein kostenloses Konto und speichern Sie Zeit bei jeder Rechnung.
+								Erstellen Sie ein kostenloses Konto und speichern Sie Zeit bei
+								jeder Rechnung.
 							</p>
 						</div>
 
@@ -266,7 +288,8 @@
 									disabled={loading}
 								/>
 								<small class="password-hint">
-									Mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen
+									Mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Zahlen und
+									Sonderzeichen
 								</small>
 							</div>
 
@@ -284,7 +307,9 @@
 									disabled={loading}
 								/>
 								{#if confirmPassword && !passwordsMatch}
-									<small class="error-text">Passwörter stimmen nicht überein</small>
+									<small class="error-text"
+										>Passwörter stimmen nicht überein</small
+									>
 								{/if}
 							</div>
 
@@ -297,8 +322,11 @@
 										disabled={loading}
 									/>
 									<span class="checkbox-text">
-										Ich akzeptiere die <a href="/agb" target="_blank">AGB</a> und die
-										<a href="/datenschutz" target="_blank">Datenschutzerklärung</a>
+										Ich akzeptiere die <a href="/agb" target="_blank">AGB</a>
+										und die
+										<a href="/datenschutz" target="_blank"
+											>Datenschutzerklärung</a
+										>
 									</span>
 								</label>
 							</div>
@@ -308,7 +336,11 @@
 									{error}
 									{#if error.includes("bereits")}
 										<div class="error-actions">
-											<button type="button" class="link-btn" on:click={goToLogin}>
+											<button
+												type="button"
+												class="link-btn"
+												on:click={goToLogin}
+											>
 												Zur Anmeldung
 											</button>
 										</div>
@@ -316,7 +348,11 @@
 								</div>
 							{/if}
 
-							<button type="submit" class="btn-primary" disabled={loading || !isFormValid}>
+							<button
+								type="submit"
+								class="btn-primary"
+								disabled={loading || !isFormValid}
+							>
 								{#if loading}
 									<div class="spinner"></div>
 									Konto wird erstellt...
@@ -368,7 +404,8 @@
 									<div class="benefit-text">
 										<h4>Automatische Vervollständigung</h4>
 										<p>
-											Bei der nächsten Rechnung sind Ihre Daten bereits ausgefüllt.
+											Bei der nächsten Rechnung sind Ihre Daten bereits
+											ausgefüllt.
 										</p>
 									</div>
 								</div>
@@ -390,7 +427,6 @@
 						</div>
 					</div>
 				</div>
-
 			{:else if registrationStep === "success"}
 				<!-- Registration Success -->
 				<div class="success-state" in:fade={{ duration: 300 }}>
@@ -405,7 +441,6 @@
 						<span></span>
 					</div>
 				</div>
-
 			{:else if registrationStep === "confirmation"}
 				<!-- Email Confirmation -->
 				<div class="confirmation-step">
@@ -417,7 +452,10 @@
 						</p>
 					</div>
 
-					<form on:submit|preventDefault={handleConfirmation} class="confirmation-form">
+					<form
+						on:submit|preventDefault={handleConfirmation}
+						class="confirmation-form"
+					>
 						<div class="input-group">
 							<label for="confirmation-code">Bestätigungscode</label>
 							<input
@@ -440,7 +478,11 @@
 							</div>
 						{/if}
 
-						<button type="submit" class="btn-primary" disabled={confirmationLoading || confirmationCode.length !== 6}>
+						<button
+							type="submit"
+							class="btn-primary"
+							disabled={confirmationLoading || confirmationCode.length !== 6}
+						>
 							{#if confirmationLoading}
 								<div class="spinner"></div>
 								Wird bestätigt...
@@ -462,14 +504,14 @@
 						</button>
 					</div>
 				</div>
-
 			{:else if registrationStep === "complete"}
 				<!-- Registration Complete -->
 				<div class="success-state" in:fade={{ duration: 300 }}>
 					<div class="success-icon-large">🎉</div>
 					<h2>Willkommen bei kostenlose-erechnung.de!</h2>
 					<p>
-						Ihr Konto wurde erfolgreich erstellt. Sie werden zur Anmeldung weitergeleitet.
+						Ihr Konto wurde erfolgreich erstellt. Sie werden zur Anmeldung
+						weitergeleitet.
 					</p>
 					<div class="loading-dots">
 						<span></span>
@@ -647,7 +689,8 @@
 		color: #adb5bd;
 	}
 
-	.password-hint, .input-hint {
+	.password-hint,
+	.input-hint {
 		font-size: 0.75rem;
 		color: #6c757d;
 		margin-top: 0.25rem;
@@ -819,12 +862,22 @@
 		animation: bounce 1.4s ease-in-out infinite both;
 	}
 
-	.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
-	.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+	.loading-dots span:nth-child(1) {
+		animation-delay: -0.32s;
+	}
+	.loading-dots span:nth-child(2) {
+		animation-delay: -0.16s;
+	}
 
 	@keyframes bounce {
-		0%, 80%, 100% { transform: scale(0); }
-		40% { transform: scale(1); }
+		0%,
+		80%,
+		100% {
+			transform: scale(0);
+		}
+		40% {
+			transform: scale(1);
+		}
 	}
 
 	/* Confirmation Step */

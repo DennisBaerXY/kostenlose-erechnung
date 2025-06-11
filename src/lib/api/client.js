@@ -16,8 +16,8 @@ async function fetchWithAuth(endpoint, options = {}, isRetry = false) {
 		...options.headers
 	};
 
-	if (tokens?.AccessToken) {
-		headers["Authorization"] = `Bearer ${tokens.AccessToken}`;
+	if (tokens?.IdToken) {
+		headers["Authorization"] = `Bearer ${tokens.IdToken}`;
 	}
 
 	const response = await fetch(`${API_BASE_URL}${endpoint}`, {

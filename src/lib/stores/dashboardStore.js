@@ -4,10 +4,12 @@ import { dashboardApi } from "$lib/api/dashboard";
 // --- Writable Stores for State Management ---
 
 export const dashboardStats = writable({
-	invoicesCount: 0,
 	customersCount: 0,
-	totalRevenue: 0,
-	lastInvoiceDate: null
+	invoicesCount: 0,
+	lastInvoiceDate: null,
+	pendingInvoices: 0,
+	templatesCount: 0,
+	totalRevenue: 0
 });
 
 export const contacts = writable([]);
@@ -31,8 +33,18 @@ export const dashboardActions = {
 				dashboardApi.getContacts()
 			]);
 
-			dashboardStats.set(statsData.stats);
-			contacts.set(contactsData.contacts);
+			// Update the stats store
+			dashboardStats.set({
+				customersCount: statsData.customersCount || 0,
+				invoicesCount: statsData.invoicesCount || 0,
+				lastInvoiceDate: statsData.lastInvoiceDate || null,
+				pendingInvoices: statsData.pendingInvoices || 0,
+				templatesCount: statsData.templatesCount || 0,
+				totalRevenue: statsData.totalRevenue || 0
+			});
+
+			// Update the contacts store
+			contacts.set(contactsData.contacts || []);
 
 			// Derive recent contacts from the full list
 			const sortedContacts = [...contactsData.contacts].sort(
@@ -43,6 +55,8 @@ export const dashboardActions = {
 			console.error("Dashboard initialization failed:", err);
 			dashboardError.set(err.message || "Failed to load dashboard data.");
 		} finally {
+			// Print dashboardstats
+
 			dashboardLoading.set(false);
 		}
 	},
