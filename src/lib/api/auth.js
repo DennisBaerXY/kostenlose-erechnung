@@ -1,100 +1,90 @@
+import { session } from "$lib/stores/session";
+import { authStore } from "$lib/stores/authStore";
+import { goto } from "$app/navigation";
+import { browser } from "$app/environment";
+
 const API_BASE_URL =
 	import.meta.env.VITE_API_URL || "https://your-api-gateway-url.com";
 
-class AuthAPI {
-	async register(email, password) {
-		console.log("API URL:", API_BASE_URL);
-		const response = await fetch(`${API_BASE_URL}/auth/register`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email, password })
-		});
-
-		return await response.json();
-	}
-
-	async login(email, password) {
-		const response = await fetch(`${API_BASE_URL}/auth/login`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email, password })
-		});
-
-		const result = await response.json();
-		console.log("Login response:", result);
-
-		if (result.success) {
-			// Store tokens in localStorage (or secure storage)
-			localStorage.setItem("tokens", JSON.stringify(result.tokens));
-			localStorage.setItem("user", JSON.stringify(result.user));
-		}
-
-		return result;
-	}
-
-	async confirm(email, confirmationCode) {
-		const response = await fetch(`${API_BASE_URL}/auth/confirm`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email, confirmationCode })
-		});
-
-		return await response.json();
-	}
-
-	async logout() {
-		const tokens = JSON.parse(localStorage.getItem("tokens") || "{}");
-
-		if (tokens.accessToken) {
-			await fetch(`${API_BASE_URL}/auth/logout`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${tokens.accessToken}`
-				},
-				body: JSON.stringify({ accessToken: tokens.accessToken })
-			});
-		}
-
-		localStorage.removeItem("tokens");
-		localStorage.removeItem("user");
-	}
-
-	async refreshToken() {
-		const tokens = JSON.parse(localStorage.getItem("tokens") || "{}");
-
-		if (!tokens.refreshToken) {
-			throw new Error("No refresh token available");
-		}
-
-		const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ refreshToken: tokens.refreshToken })
-		});
-
-		const result = await response.json();
-
-		if (result.success) {
-			const newTokens = { ...tokens, ...result.tokens };
-			localStorage.setItem("tokens", JSON.stringify(newTokens));
-		}
-
-		return result;
-	}
-
-	getCurrentUser() {
-		return JSON.parse(localStorage.getItem("user") || "null");
-	}
-
-	getAccessToken() {
-		const tokens = JSON.parse(localStorage.getItem("tokens") || "{}");
-		return tokens.accessToken;
-	}
-
-	isAuthenticated() {
-		return !!this.getAccessToken();
-	}
+/**
+ * A collection of authentication-related API calls.
+ * This does NOT use the authenticated client because these are public endpoints.
+ */
+async function postToAuth(endpoint, body) {
+	const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body)
+	});
+	return await response.json();
 }
 
-export const authAPI = new AuthAPI();
+export const auth = {
+	/**
+	 * Logs in the user.
+	 * @param {string} email
+	 * @param {string} password
+	 */
+	login: async (email, password) => {
+		const result = await postToAuth("/auth/login", { email, password });
+		if (result.success) {
+			session.set(result.user, result.tokens);
+			authStore.sync(); // Update the global state
+		}
+		return result;
+	},
+
+	/**
+	 * Logs out the user.
+	 */
+	logout: async () => {
+		const tokens = session.getTokens();
+		if (tokens?.accessToken) {
+			// We don't need to wait for this to complete.
+			postToAuth("/auth/logout", { accessToken: tokens.accessToken });
+		}
+		session.clear();
+		authStore.sync(); // Update the global state
+		if (browser) goto("/login");
+	},
+
+	/**
+	 * Refreshes the authentication tokens.
+	 */
+	refreshToken: async () => {
+		const tokens = session.getTokens();
+		if (!tokens?.refreshToken) {
+			throw new Error("No refresh token available.");
+		}
+
+		const result = await postToAuth("/auth/refresh", {
+			refreshToken: tokens.refreshToken
+		});
+
+		if (result.success) {
+			session.set(session.getUser(), result.tokens); // Update tokens in storage
+			authStore.sync(); // Update the global state
+		}
+		return result;
+	},
+
+	/**
+	 * Registers a new user.
+	 * @param {string} email
+	 * @param {string} password
+	 */
+	register: (email, password) =>
+		postToAuth("/auth/register", { email, password }),
+
+	/**
+	 * Confirms user registration.
+	 * @param {string} email
+	 * @param {string} confirmationCode
+	 */
+	confirm: (email, confirmationCode) =>
+		postToAuth("/auth/confirm", { email, confirmationCode }),
+
+	resendConfirmation: (email) =>
+		postToAuth("/auth/resend-confirmation", { email }),
+	forgotPassword: (email) => postToAuth("/auth/reset-password", { email })
+};

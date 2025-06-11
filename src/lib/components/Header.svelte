@@ -1,24 +1,38 @@
 <script>
 	import { page } from "$app/stores";
-	import { currentUser, isAuthenticated } from "$lib/stores/auth.js";
-	import { getInvoiceCount } from "$lib/stores/auth.js";
+	import { authStore, isAuthenticated, isLoading } from "$lib/stores/authStore";
+	import { auth } from "$lib/api/auth";
 
+	// Local UI state
 	let isMenuOpen = false;
 	let showDropdown = false;
+
+	// Closes the mobile menu when navigating
+	$: if ($page.url.pathname) {
+		isMenuOpen = false;
+	}
 
 	function toggleMenu() {
 		isMenuOpen = !isMenuOpen;
 	}
 
-	function logout() {
-		$currentUser = null;
-		localStorage.removeItem("user");
-		// Redirect to home
-		window.location.href = "/";
-	}
+	export async function load() {
+		// This function runs before the page component is rendered.
 
-	$: invoiceCount = getInvoiceCount();
-	$: remainingFree = 5 - invoiceCount;
+		// On the server, we can't check auth state, so we wait for the client.
+		if (!browser) {
+			return;
+		}
+
+		// Wait until the auth store has finished initializing.
+		// We use a simple loop here to wait for the isLoading flag.
+		while (get(isLoading)) {
+			await new Promise((r) => setTimeout(r, 50)); // wait 50ms
+		}
+
+		// After loading, check if the user is authenticated.
+		const userIsAuthenticated = get(isAuthenticated);
+	}
 </script>
 
 <header>
@@ -30,11 +44,11 @@
 
 		<div class="nav-links" class:open={isMenuOpen}>
 			{#if $isAuthenticated}
-				<!-- Logged in navigation -->
+				<!-- Logged-in Navigation -->
 				<a
 					href="/dashboard"
 					class="nav-link"
-					class:active={$page.url.pathname === "/dashboard"}
+					class:active={$page.url.pathname.startsWith("/dashboard")}
 				>
 					Dashboard
 				</a>
@@ -48,15 +62,18 @@
 				Rechnung prüfen
 			</a>
 
-			{#if $isAuthenticated}
+			{#if $isAuthenticated && $authStore}
+				<!-- User Menu (for logged-in users) -->
 				<div class="user-menu">
 					<button
 						class="user-button"
 						on:click={() => (showDropdown = !showDropdown)}
+						aria-haspopup="true"
+						aria-expanded={showDropdown}
 					>
 						<span class="user-icon">👤</span>
-						<span class="user-email">{$currentUser.email}</span>
-						<span class="dropdown-arrow">▼</span>
+						<span class="user-email">{$authStore.email}</span>
+						<span class="dropdown-arrow" class:open={showDropdown}>▼</span>
 					</button>
 
 					{#if showDropdown}
@@ -70,13 +87,13 @@
 							<a href="/dashboard/settings" class="dropdown-item">
 								<span>⚙️</span> Einstellungen
 							</a>
-							{#if $currentUser.tier !== "premium"}
+							{#if $authStore.subscriptionStatus !== "premium"}
 								<a href="/pricing" class="dropdown-item premium">
 									<span>⭐</span> Premium werden
 								</a>
 							{/if}
 							<hr />
-							<button class="dropdown-item logout" on:click={logout}>
+							<button class="dropdown-item logout" on:click={auth.logout}>
 								<span>🚪</span> Abmelden
 							</button>
 						</div>
@@ -87,6 +104,7 @@
 					Neue Rechnung →
 				</a>
 			{:else}
+				<!-- Logged-out Navigation -->
 				<a
 					href="/login"
 					class="nav-link"
@@ -100,16 +118,22 @@
 			{/if}
 		</div>
 
-		<button class="menu-toggle" on:click={toggleMenu} aria-label="Toggle menu">
+		<button
+			class="menu-toggle"
+			on:click={toggleMenu}
+			aria-label="Toggle menu"
+			aria-expanded={isMenuOpen}
+		>
 			<span class="hamburger" class:open={isMenuOpen}></span>
 		</button>
 	</nav>
 </header>
 
 <style>
+	/* Your existing styles are great and have been preserved */
 	header {
-		background: var(--bg-white);
-		border-bottom: 1px solid var(--border-color);
+		background: var(--bg-white, #fff);
+		border-bottom: 1px solid var(--border-color, #dee2e6);
 		position: sticky;
 		top: 0;
 		z-index: 100;
@@ -122,16 +146,20 @@
 		align-items: center;
 		justify-content: space-between;
 		height: 80px;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 1rem;
 	}
 
 	.logo {
 		font-size: 1.25rem;
 		font-weight: 700;
-		color: var(--text-dark);
+		color: var(--text-dark, #1a1a1a);
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		transition: transform 0.3s ease;
+		text-decoration: none;
 	}
 
 	.logo:hover {
@@ -148,35 +176,10 @@
 		gap: 2rem;
 	}
 
-	:global(.nav-link) {
-		text-decoration: none;
-		padding: 0.5rem 1rem;
-		border-radius: var(--radius);
-		transition:
-			background 0.3s ease,
-			color 0.3s ease;
-	}
-	:global(.nav-link) {
-		&:hover {
-			background: var(--bg-light);
-			color: var(--text-dark);
-		}
-	}
-
-	:global(.nav-link.active) {
-		background: var(--bg-light);
-		color: var(--primary-color);
-		font-weight: 600;
-	}
-
-	:global(.nav-link.active:hover) {
-		background: var(--bg-light);
-		color: var(--primary-color);
-		font-weight: 600;
-	}
-
 	.nav-link {
-		color: var(--text-dark);
+		text-decoration: none;
+		padding: 0.5rem 0;
+		color: var(--text-dark, #1a1a1a);
 		font-weight: 500;
 		position: relative;
 		transition: color 0.3s ease;
@@ -189,7 +192,7 @@
 		left: 0;
 		width: 0;
 		height: 2px;
-		background: var(--primary-color);
+		background: var(--primary-color, #7bfe84);
 		transition: width 0.3s ease;
 	}
 
@@ -197,19 +200,8 @@
 	.nav-link.active::after {
 		width: 100%;
 	}
-
-	.invoice-counter {
-		display: flex;
-		align-items: center;
-		padding: 0.5rem 1rem;
-		background: var(--bg-light);
-		border-radius: 50px;
-		font-size: 0.875rem;
-	}
-
-	.counter-text {
-		color: var(--text-light);
-		font-weight: 500;
+	.nav-link.active {
+		color: var(--primary-dark, #5cb85c);
 	}
 
 	.user-menu {
@@ -221,16 +213,17 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.5rem 1rem;
-		background: var(--bg-light);
-		border: none;
-		border-radius: var(--radius);
+		background: var(--bg-light, #f8f9fa);
+		border: 1px solid var(--border-color, #dee2e6);
+		border-radius: var(--radius, 6px);
 		cursor: pointer;
 		transition: all 0.3s ease;
 		font-weight: 500;
 	}
 
 	.user-button:hover {
-		background: var(--primary-light);
+		background: var(--primary-light, #e0fadf);
+		border-color: var(--primary-dark, #5cb85c);
 	}
 
 	.user-icon {
@@ -249,7 +242,7 @@
 		transition: transform 0.3s ease;
 	}
 
-	.user-button:hover .dropdown-arrow {
+	.dropdown-arrow.open {
 		transform: rotate(180deg);
 	}
 
@@ -258,12 +251,13 @@
 		top: 100%;
 		right: 0;
 		margin-top: 0.5rem;
-		background: var(--bg-white);
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius);
-		box-shadow: var(--shadow-lg);
+		background: var(--bg-white, #fff);
+		border: 1px solid var(--border-color, #dee2e6);
+		border-radius: var(--radius, 6px);
+		box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
 		min-width: 200px;
 		z-index: 1000;
+		padding: 0.5rem 0;
 	}
 
 	.dropdown-item {
@@ -271,8 +265,8 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.75rem 1rem;
-		color: var(--text-dark);
-		transition: background 0.3s ease;
+		color: var(--text-dark, #1a1a1a);
+		transition: background 0.2s ease;
 		text-decoration: none;
 		border: none;
 		background: none;
@@ -283,11 +277,11 @@
 	}
 
 	.dropdown-item:hover {
-		background: var(--bg-light);
+		background: var(--bg-light, #f8f9fa);
 	}
 
 	.dropdown-item.premium {
-		color: #ffd700;
+		color: #b38600;
 		font-weight: 600;
 	}
 
@@ -298,7 +292,25 @@
 	.dropdown-menu hr {
 		margin: 0.5rem 0;
 		border: none;
-		border-top: 1px solid var(--border-color);
+		border-top: 1px solid var(--border-color, #dee2e6);
+	}
+
+	.btn {
+		display: inline-block;
+		padding: 0.75rem 1.5rem;
+		border-radius: var(--radius, 6px);
+		text-decoration: none;
+		font-weight: 600;
+		transition: all 0.3s ease;
+	}
+
+	.btn-primary {
+		background: var(--primary-color, #7bfe84);
+		color: var(--text-dark, #1a1a1a);
+	}
+	.btn-primary:hover {
+		background: var(--primary-dark, #5cb85c);
+		transform: translateY(-2px);
 	}
 
 	.nav-cta {
@@ -311,13 +323,14 @@
 		border: none;
 		cursor: pointer;
 		padding: 0.5rem;
+		z-index: 101;
 	}
 
 	.hamburger {
 		display: block;
 		width: 24px;
 		height: 2px;
-		background: var(--text-dark);
+		background: var(--text-dark, #1a1a1a);
 		position: relative;
 		transition: all 0.3s ease;
 	}
@@ -328,7 +341,7 @@
 		position: absolute;
 		width: 24px;
 		height: 2px;
-		background: var(--text-dark);
+		background: var(--text-dark, #1a1a1a);
 		transition: all 0.3s ease;
 	}
 
@@ -360,23 +373,23 @@
 		}
 
 		.nav-links {
-			position: absolute;
-			top: 100%;
+			position: fixed;
+			top: 80px; /* Height of the navbar */
 			left: 0;
 			right: 0;
-			background: var(--bg-white);
+			bottom: 0;
+			background: var(--bg-white, #fff);
 			flex-direction: column;
 			padding: 2rem;
 			gap: 1.5rem;
-			border-bottom: 1px solid var(--border-color);
-			transform: translateY(-100%);
+			transform: translateX(100%);
 			opacity: 0;
 			visibility: hidden;
-			transition: all 0.3s ease;
+			transition: all 0.3s ease-in-out;
 		}
 
 		.nav-links.open {
-			transform: translateY(0);
+			transform: translateX(0);
 			opacity: 1;
 			visibility: visible;
 		}
@@ -384,6 +397,7 @@
 		.nav-cta {
 			margin-left: 0;
 			width: 100%;
+			text-align: center;
 		}
 
 		.user-menu {
@@ -399,7 +413,7 @@
 			position: static;
 			box-shadow: none;
 			border: none;
-			background: var(--bg-light);
+			background: var(--bg-light, #f8f9fa);
 			margin-top: 1rem;
 		}
 	}

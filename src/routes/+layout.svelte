@@ -1,8 +1,23 @@
 <script>
 	import Header from "$lib/components/Header.svelte";
 	import Footer from "$lib/components/Footer.svelte";
+	import { authStore } from "$lib/stores/authStore.js";
+	import { browser } from "$app/environment";
 
-	import { onMount } from "svelte";
+	/**
+	 * This load function runs on the client when the app first starts.
+	 * It's the perfect place to initialize client-side stores and services.
+	 * @type {import('./$types').LayoutLoad}
+	 */
+	export async function load() {
+		if (browser) {
+			// Initialize the authentication store by reading from localStorage.
+			authStore.init();
+		}
+
+		// We don't need to return any props, so an empty object is fine.
+		return {};
+	}
 </script>
 
 <div class="app">
