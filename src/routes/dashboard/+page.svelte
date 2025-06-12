@@ -1,11 +1,10 @@
-<!-- src/routes/dashboard/+page.svelte - FIXED VERSION -->
+<!-- src/routes/dashboard/+page.svelte - VOLLSTÄNDIGE IMPLEMENTATION -->
 <script>
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 
 	import { authStore, isAuthenticated, isLoading } from "$lib/stores/authStore";
-
 	import {
 		dashboardStats,
 		contacts,
@@ -18,6 +17,10 @@
 	// Local UI State
 	let activeTab = "overview";
 	let showCreateContactModal = false;
+	let recentInvoices = [];
+	let loadingInvoices = false;
+
+	// Contact form
 	let newContact = {
 		name: "",
 		email: "",
@@ -27,21 +30,47 @@
 		phone: ""
 	};
 
-	// Reactive Redirect - redirect if not authenticated after loading completes
+	// Reactive Redirect
 	$: if (browser && !$isAuthenticated && !$isLoading) {
 		goto("/login");
 	}
 
 	onMount(() => {
-		// Wait for auth to load, then initialize dashboard if authenticated
 		const unsubscribe = isLoading.subscribe((loading) => {
 			if (!loading && $isAuthenticated) {
 				dashboardActions.initialize();
+				loadRecentInvoices();
 			}
 		});
 
 		return unsubscribe;
 	});
+
+	// Load recent invoices
+	async function loadRecentInvoices() {
+		if (!$isAuthenticated) return;
+
+		loadingInvoices = true;
+		try {
+			const response = await fetch(
+				`${import.meta.env.VITE_API_URL}/invoices/recent`,
+				{
+					headers: {
+						Authorization: `Bearer ${authStore.getTokens()?.IdToken}`
+					}
+				}
+			);
+
+			if (response.ok) {
+				const data = await response.json();
+				recentInvoices = data.invoices || [];
+			}
+		} catch (error) {
+			console.error("Error loading invoices:", error);
+		} finally {
+			loadingInvoices = false;
+		}
+	}
 
 	// Helper Functions
 	function formatDate(dateString) {
@@ -54,12 +83,6 @@
 			style: "currency",
 			currency: "EUR"
 		}).format(amount || 0);
-	}
-
-	function handleCloseModal(event) {
-		if (event.key === "Escape") {
-			showCreateContactModal = false;
-		}
 	}
 
 	// Action Handlers
@@ -85,6 +108,42 @@
 			await dashboardActions.deleteContact(contactId);
 		}
 	}
+
+	function openInvoiceCreator(templateData = null) {
+		if (templateData) {
+			// Als Vorlage verwenden - Daten in localStorage speichern
+			localStorage.setItem("invoice_template", JSON.stringify(templateData));
+		}
+		goto("/erstellen");
+	}
+
+	async function downloadInvoiceFiles(invoice) {
+		try {
+			// PDF Download
+			if (invoice.files?.pdf) {
+				const response = await fetch(
+					`${import.meta.env.VITE_API_URL}/invoices/${invoice.id}/pdf`,
+					{
+						headers: {
+							Authorization: `Bearer ${authStore.getTokens()?.IdToken}`
+						}
+					}
+				);
+				if (response.ok) {
+					const blob = await response.blob();
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement("a");
+					a.href = url;
+					a.download = invoice.files.pdf;
+					a.click();
+					URL.revokeObjectURL(url);
+				}
+			}
+		} catch (error) {
+			console.error("Download error:", error);
+			alert("Fehler beim Download der Rechnung");
+		}
+	}
 </script>
 
 <svelte:head>
@@ -95,7 +154,7 @@
 	{#if $isAuthenticated && $authStore}
 		<div class="dashboard-header">
 			<div class="welcome">
-				<h1>Willkommen zurück 💚</h1>
+				<h1>Willkommen zurück, {$authStore.email?.split("@")[0]}! 💚</h1>
 				<p>Verwalten Sie Ihre E-Rechnungen, Kunden und Vorlagen</p>
 			</div>
 			<div class="actions">
@@ -119,13 +178,13 @@
 				</button>
 			</div>
 		{:else}
-			<!-- Main content: stats, tabs, etc. -->
+			<!-- Stats Grid -->
 			<div class="stats-grid">
 				<div class="stat-card">
 					<div class="stat-icon">📄</div>
 					<div class="stat-content">
 						<div class="stat-value">{$dashboardStats.invoicesCount}</div>
-						<div class="stat-label">Rechnungen</div>
+						<div class="stat-label">Rechnungen erstellt</div>
 					</div>
 				</div>
 
@@ -133,7 +192,7 @@
 					<div class="stat-icon">👥</div>
 					<div class="stat-content">
 						<div class="stat-value">{$dashboardStats.customersCount}</div>
-						<div class="stat-label">Kunden</div>
+						<div class="stat-label">Gespeicherte Kunden</div>
 					</div>
 				</div>
 
@@ -158,6 +217,7 @@
 				</div>
 			</div>
 
+			<!-- Tabs Navigation -->
 			<div class="dashboard-content">
 				<nav class="tabs">
 					<button
@@ -165,48 +225,315 @@
 						class:active={activeTab === "overview"}
 						on:click={() => (activeTab = "overview")}
 					>
-						Übersicht
-					</button>
-					<button
-						class="tab"
-						class:active={activeTab === "customers"}
-						on:click={() => (activeTab = "customers")}
-					>
-						Kunden
+						📊 Übersicht
 					</button>
 					<button
 						class="tab"
 						class:active={activeTab === "invoices"}
 						on:click={() => (activeTab = "invoices")}
 					>
-						Rechnungen
+						📄 Rechnungen
 					</button>
 					<button
 						class="tab"
-						class:active={activeTab === "templates"}
-						on:click={() => (activeTab = "templates")}
+						class:active={activeTab === "customers"}
+						on:click={() => (activeTab = "customers")}
 					>
-						Vorlagen
+						👥 Kunden
+					</button>
+					<button
+						class="tab"
+						class:active={activeTab === "profile"}
+						on:click={() => (activeTab = "profile")}
+					>
+						⚙️ Profil
 					</button>
 				</nav>
 
 				<div class="tab-content">
-					<!-- Your existing tab content logic fits here perfectly -->
 					{#if activeTab === "overview"}
 						<div class="overview-content">
-							<p>Übersicht Inhalt...</p>
-						</div>
-					{:else if activeTab === "customers"}
-						<div class="customers-content">
-							<p>Kunden Inhalt...</p>
+							<div class="overview-grid">
+								<!-- Recent Invoices -->
+								<div class="overview-card">
+									<div class="card-header">
+										<h3>🕒 Letzte Rechnungen</h3>
+										<a
+											href="#"
+											on:click={() => (activeTab = "invoices")}
+											class="view-all">Alle anzeigen →</a
+										>
+									</div>
+
+									{#if loadingInvoices}
+										<div class="card-loading">
+											<div class="spinner-small"></div>
+											<span>Lade Rechnungen...</span>
+										</div>
+									{:else if recentInvoices.length === 0}
+										<div class="empty-state">
+											<p>Noch keine Rechnungen erstellt</p>
+											<a href="/erstellen" class="btn btn-primary btn-small"
+												>Erste Rechnung erstellen</a
+											>
+										</div>
+									{:else}
+										<div class="recent-list">
+											{#each recentInvoices.slice(0, 5) as invoice}
+												<div class="recent-item">
+													<div class="recent-info">
+														<strong
+															>{invoice.data.metadata.invoiceNumber}</strong
+														>
+														<span class="recent-meta"
+															>{invoice.data.recipient.name} • {formatDate(
+																invoice.data.metadata.date
+															)}</span
+														>
+													</div>
+													<div class="recent-amount">
+														{formatCurrency(invoice.total)}
+													</div>
+													<div class="recent-actions">
+														<button
+															class="btn-icon"
+															on:click={() => downloadInvoiceFiles(invoice)}
+															title="Herunterladen"
+														>
+															📥
+														</button>
+														<button
+															class="btn-icon"
+															on:click={() => openInvoiceCreator(invoice.data)}
+															title="Als Vorlage verwenden"
+														>
+															📋
+														</button>
+													</div>
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+
+								<!-- Recent Contacts -->
+								<div class="overview-card">
+									<div class="card-header">
+										<h3>👥 Letzte Kunden</h3>
+										<a
+											href="#"
+											on:click={() => (activeTab = "customers")}
+											class="view-all">Alle anzeigen →</a
+										>
+									</div>
+
+									{#if $contacts.length === 0}
+										<div class="empty-state">
+											<p>Noch keine Kunden gespeichert</p>
+											<button
+												class="btn btn-secondary btn-small"
+												on:click={() => (showCreateContactModal = true)}
+											>
+												Ersten Kunden anlegen
+											</button>
+										</div>
+									{:else}
+										<div class="recent-list">
+											{#each $recentContacts as contact}
+												<div class="recent-item">
+													<div class="recent-info">
+														<strong>{contact.name}</strong>
+														<span class="recent-meta"
+															>{contact.email || contact.city}</span
+														>
+													</div>
+													<div class="recent-actions">
+														<button
+															class="btn-icon"
+															on:click={() =>
+																openInvoiceCreator({ recipient: contact })}
+															title="Rechnung erstellen"
+														>
+															📄
+														</button>
+													</div>
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+
+								<!-- Quick Actions -->
+								<div class="overview-card quick-actions">
+									<h3>⚡ Schnellaktionen</h3>
+									<div class="action-buttons">
+										<a href="/erstellen" class="action-btn">
+											<span class="action-icon">📄</span>
+											<span class="action-text">Neue Rechnung</span>
+										</a>
+										<button
+											class="action-btn"
+											on:click={() => (showCreateContactModal = true)}
+										>
+											<span class="action-icon">👤</span>
+											<span class="action-text">Kunde hinzufügen</span>
+										</button>
+										<a href="/auslesen" class="action-btn">
+											<span class="action-icon">🔍</span>
+											<span class="action-text">Rechnung prüfen</span>
+										</a>
+									</div>
+								</div>
+							</div>
 						</div>
 					{:else if activeTab === "invoices"}
 						<div class="invoices-content">
-							<p>Rechnungen Inhalt...</p>
+							<div class="content-header">
+								<h2>Ihre Rechnungen</h2>
+								<a href="/erstellen" class="btn btn-primary">+ Neue Rechnung</a>
+							</div>
+
+							{#if loadingInvoices}
+								<div class="loading-content">
+									<div class="spinner"></div>
+									<p>Lade Rechnungen...</p>
+								</div>
+							{:else if recentInvoices.length === 0}
+								<div class="empty-state-large">
+									<div class="empty-icon">📄</div>
+									<h3>Noch keine Rechnungen</h3>
+									<p>Erstellen Sie Ihre erste professionelle E-Rechnung</p>
+									<a href="/erstellen" class="btn btn-primary">Jetzt starten</a>
+								</div>
+							{:else}
+								<div class="invoices-table">
+									<div class="table-header">
+										<div class="th">Nr.</div>
+										<div class="th">Kunde</div>
+										<div class="th">Datum</div>
+										<div class="th">Betrag</div>
+										<div class="th">Aktionen</div>
+									</div>
+									{#each recentInvoices as invoice}
+										<div class="table-row">
+											<div class="td font-mono">
+												{invoice.data.metadata.invoiceNumber}
+											</div>
+											<div class="td">{invoice.data.recipient.name}</div>
+											<div class="td">
+												{formatDate(invoice.data.metadata.date)}
+											</div>
+											<div class="td font-bold">
+												{formatCurrency(invoice.total)}
+											</div>
+											<div class="td">
+												<div class="action-buttons-inline">
+													<button
+														class="btn-icon"
+														on:click={() => downloadInvoiceFiles(invoice)}
+														title="Herunterladen">📥</button
+													>
+													<button
+														class="btn-icon"
+														on:click={() => openInvoiceCreator(invoice.data)}
+														title="Als Vorlage">📋</button
+													>
+												</div>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
-					{:else if activeTab === "templates"}
-						<div class="templates-content">
-							<p>Vorlagen Inhalt...</p>
+					{:else if activeTab === "customers"}
+						<div class="customers-content">
+							<div class="content-header">
+								<h2>Ihre Kunden</h2>
+								<button
+									class="btn btn-primary"
+									on:click={() => (showCreateContactModal = true)}
+								>
+									+ Neuer Kunde
+								</button>
+							</div>
+
+							{#if $contacts.length === 0}
+								<div class="empty-state-large">
+									<div class="empty-icon">👥</div>
+									<h3>Noch keine Kunden</h3>
+									<p>
+										Speichern Sie Kundendaten für schnellere Rechnungserstellung
+									</p>
+									<button
+										class="btn btn-primary"
+										on:click={() => (showCreateContactModal = true)}
+									>
+										Ersten Kunden anlegen
+									</button>
+								</div>
+							{:else}
+								<div class="contacts-grid">
+									{#each $contacts as contact}
+										<div class="contact-card">
+											<div class="contact-header">
+												<h4>{contact.name}</h4>
+												<div class="contact-actions">
+													<button
+														class="btn-icon"
+														on:click={() =>
+															openInvoiceCreator({ recipient: contact })}
+														title="Rechnung erstellen">📄</button
+													>
+													<button
+														class="btn-icon danger"
+														on:click={() =>
+															handleDeleteContact(contact.contactId)}
+														title="Löschen">🗑️</button
+													>
+												</div>
+											</div>
+											<div class="contact-details">
+												{#if contact.email}<p>📧 {contact.email}</p>{/if}
+												{#if contact.street}<p>
+														📍 {contact.street}, {contact.zip}
+														{contact.city}
+													</p>{/if}
+												{#if contact.phone}<p>📞 {contact.phone}</p>{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{:else if activeTab === "profile"}
+						<div class="profile-content">
+							<div class="content-header">
+								<h2>Profil & Einstellungen</h2>
+							</div>
+
+							<div class="profile-grid">
+								<div class="profile-card">
+									<h3>🏢 Firmendaten</h3>
+									<p>Ihre Standard-Absenderdaten für alle Rechnungen</p>
+									<button class="btn btn-secondary"
+										>Firmendaten bearbeiten</button
+									>
+								</div>
+
+								<div class="profile-card">
+									<h3>🔐 Konto</h3>
+									<p>E-Mail: {$authStore.email}</p>
+									<p>Plan: {$authStore.subscriptionStatus || "Kostenlos"}</p>
+									<div class="profile-actions">
+										<button class="btn btn-secondary">Passwort ändern</button>
+										{#if $authStore.subscriptionStatus !== "premium"}
+											<a href="/preise" class="btn btn-primary"
+												>Upgrade zu Premium</a
+											>
+										{/if}
+									</div>
+								</div>
+							</div>
 						</div>
 					{/if}
 				</div>
@@ -225,30 +552,70 @@
 	{/if}
 </div>
 
-<!-- Create Contact Modal - NO CHANGES -->
+<!-- Create Contact Modal -->
 {#if showCreateContactModal}
-	<div
-		class="modal-overlay"
-		on:click={() => (showCreateContactModal = false)}
-		on:keydown={handleCloseModal}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="modal-title"
-		tabindex="-1"
-	>
-		<div class="modal" on:click|stopPropagation role="document">
+	<div class="modal-overlay" on:click={() => (showCreateContactModal = false)}>
+		<div class="modal" on:click|stopPropagation>
 			<div class="modal-header">
-				<h3 id="modal-title">Neuen Kunden anlegen</h3>
+				<h3>Neuen Kunden anlegen</h3>
 				<button
 					class="modal-close"
-					on:click={() => (showCreateContactModal = false)}
+					on:click={() => (showCreateContactModal = false)}>✕</button
 				>
-					✕
-				</button>
 			</div>
 
 			<div class="modal-content">
-				<!-- Your form content here -->
+				<div class="form-grid">
+					<div class="form-group">
+						<label>Firmenname / Name *</label>
+						<input
+							type="text"
+							bind:value={newContact.name}
+							placeholder="Mustermann GmbH"
+							required
+						/>
+					</div>
+					<div class="form-group">
+						<label>E-Mail</label>
+						<input
+							type="email"
+							bind:value={newContact.email}
+							placeholder="info@mustermann.de"
+						/>
+					</div>
+					<div class="form-group">
+						<label>Straße</label>
+						<input
+							type="text"
+							bind:value={newContact.street}
+							placeholder="Musterstraße 123"
+						/>
+					</div>
+					<div class="form-group half">
+						<label>PLZ</label>
+						<input
+							type="text"
+							bind:value={newContact.zip}
+							placeholder="12345"
+						/>
+					</div>
+					<div class="form-group half">
+						<label>Stadt</label>
+						<input
+							type="text"
+							bind:value={newContact.city}
+							placeholder="Musterstadt"
+						/>
+					</div>
+					<div class="form-group">
+						<label>Telefon</label>
+						<input
+							type="tel"
+							bind:value={newContact.phone}
+							placeholder="+49 123 456789"
+						/>
+					</div>
+				</div>
 			</div>
 
 			<div class="modal-actions">
@@ -258,7 +625,11 @@
 				>
 					Abbrechen
 				</button>
-				<button class="btn btn-primary" on:click={handleCreateContact}>
+				<button
+					class="btn btn-primary"
+					on:click={handleCreateContact}
+					disabled={!newContact.name}
+				>
 					Kunde anlegen
 				</button>
 			</div>
@@ -409,5 +780,295 @@
 
 	.tab-content {
 		min-height: 200px;
+	}
+	.overview-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 2rem;
+		margin-bottom: 2rem;
+	}
+
+	.overview-card {
+		background: var(--bg-white);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-lg);
+		padding: 1.5rem;
+	}
+
+	.overview-card.quick-actions {
+		grid-column: 1 / -1;
+	}
+
+	.card-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.card-header h3 {
+		margin: 0;
+		font-size: 1.125rem;
+	}
+
+	.view-all {
+		color: var(--primary-dark);
+		text-decoration: none;
+		font-size: 0.875rem;
+	}
+
+	.recent-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.recent-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.75rem;
+		background: var(--bg-light);
+		border-radius: var(--radius);
+	}
+
+	.recent-info strong {
+		display: block;
+		margin-bottom: 0.25rem;
+	}
+
+	.recent-meta {
+		font-size: 0.875rem;
+		color: var(--text-light);
+	}
+
+	.recent-amount {
+		font-weight: 600;
+		color: var(--primary-dark);
+	}
+
+	.recent-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.btn-icon {
+		background: none;
+		border: none;
+		padding: 0.25rem;
+		cursor: pointer;
+		border-radius: 4px;
+		transition: background 0.2s;
+	}
+
+	.btn-icon:hover {
+		background: var(--border-color);
+	}
+
+	.action-buttons {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		gap: 1rem;
+	}
+
+	.action-btn {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 1rem;
+		border: 2px solid var(--border-color);
+		border-radius: var(--radius);
+		text-decoration: none;
+		color: var(--text-dark);
+		transition: all 0.2s;
+		background: none;
+		cursor: pointer;
+	}
+
+	.action-btn:hover {
+		border-color: var(--primary-color);
+		background: var(--primary-light);
+	}
+
+	.action-icon {
+		font-size: 2rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.empty-state,
+	.empty-state-large {
+		text-align: center;
+		padding: 2rem;
+		color: var(--text-light);
+	}
+
+	.empty-state-large .empty-icon {
+		font-size: 4rem;
+		margin-bottom: 1rem;
+	}
+
+	.invoices-table {
+		background: var(--bg-white);
+		border-radius: var(--radius);
+		overflow: hidden;
+		border: 1px solid var(--border-color);
+	}
+
+	.table-header,
+	.table-row {
+		display: grid;
+		grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
+		gap: 1rem;
+		padding: 1rem;
+		align-items: center;
+	}
+
+	.table-header {
+		background: var(--bg-light);
+		font-weight: 600;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.table-row {
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.table-row:last-child {
+		border-bottom: none;
+	}
+
+	.contacts-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 1.5rem;
+	}
+
+	.contact-card {
+		background: var(--bg-white);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius);
+		padding: 1.5rem;
+	}
+
+	.contact-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.contact-details p {
+		margin: 0.5rem 0;
+		font-size: 0.875rem;
+		color: var(--text-light);
+	}
+
+	.profile-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 2rem;
+	}
+
+	.profile-card {
+		background: var(--bg-white);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius);
+		padding: 2rem;
+	}
+
+	.profile-actions {
+		display: flex;
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+
+	/* Modal Styles */
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.5);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
+
+	.modal {
+		background: var(--bg-white);
+		border-radius: var(--radius-lg);
+		max-width: 600px;
+		width: 90%;
+		max-height: 90vh;
+		overflow-y: auto;
+	}
+
+	.modal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1.5rem;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.modal-content {
+		padding: 1.5rem;
+	}
+
+	.modal-actions {
+		display: flex;
+		justify-content: space-between;
+		padding: 1.5rem;
+		border-top: 1px solid var(--border-color);
+		gap: 1rem;
+	}
+
+	.form-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1rem;
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.form-group.half {
+		grid-column: span 1;
+	}
+
+	.form-group label {
+		font-weight: 500;
+		font-size: 0.875rem;
+	}
+
+	.form-group input {
+		padding: 0.75rem;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius);
+	}
+
+	@media (max-width: 768px) {
+		.overview-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.table-header,
+		.table-row {
+			grid-template-columns: 1fr;
+			gap: 0.5rem;
+		}
+
+		.contacts-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.form-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
