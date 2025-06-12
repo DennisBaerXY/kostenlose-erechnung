@@ -15,8 +15,8 @@
 
 <style>
 	:global(:root) {
-		--primary-color: #7bfe84;
-		--primary-dark: #5fcc67;
+		--primary-color: #00ef7e;
+		--primary-dark: #00cf6d;
 		--primary-light: #a8fead;
 		--text-dark: #1a1a1a;
 		--text-light: #666;

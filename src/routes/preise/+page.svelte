@@ -435,14 +435,14 @@
 			<div class="comparison-wrapper">
 				<!-- Header mit Preisen -->
 				<div class="comparison-header">
-					<div class="comparison-cell feature-header">Preis pro Monat ab*</div>
+					<div class="comparison-cell plan-header"></div>
 					<div class="comparison-cell plan-header">Starter</div>
 					<div class="comparison-cell plan-header popular">Freelancer</div>
 					<div class="comparison-cell plan-header">Wachstum</div>
 				</div>
 
 				<div class="comparison-prices">
-					<div class="comparison-cell"></div>
+					<div class="comparison-cell price-cell"></div>
 					<div class="comparison-cell price-cell">Kostenlos</div>
 					<div class="comparison-cell price-cell popular">
 						{formatPrice(PRICING_CONFIG.plans[1].price[selectedPeriod])}
@@ -582,7 +582,7 @@
 	.hero {
 		text-align: center;
 		background: linear-gradient(135deg, var(--bg-white) 0%, #fafbfc 100%);
-		padding: var(--section-padding) 0;
+		padding: var(--section-padding) 0 0 0;
 	}
 
 	.hero-content {
@@ -625,14 +625,13 @@
 		cursor: pointer;
 		font-weight: 600;
 		color: #64748b;
-		transition: var(--transition);
 		white-space: nowrap;
 		position: relative;
 	}
 
 	.period-option.active {
-		background: white;
-		color: #0f172a;
+		background: var(--primary-color);
+		color: var(--text-darkte);
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	}
 
@@ -816,24 +815,24 @@
 	}
 
 	.plan-button.primary {
-		background: #6366f1;
-		color: white;
+		background: var(--primary-color);
+		color: black;
 	}
 
 	.plan-button.primary:hover {
-		background: #4f46e5;
+		background: var(--primary-color);
 		transform: translateY(-1px);
 	}
 
 	.plan-button.secondary {
 		background: transparent;
-		color: #6366f1;
-		border: 2px solid #6366f1;
+		color: var(--primary-color);
+		border: 2px solid var(--primary-color);
 	}
 
 	.plan-button.secondary:hover {
-		background: #6366f1;
-		color: white;
+		background: var(--primary-color);
+		color: black;
 	}
 
 	/* Plan Features */
@@ -1033,14 +1032,14 @@
 	}
 
 	.comparison-cta.primary {
-		background: #6366f1;
-		color: white;
+		background: var(--primary-dark);
+		color: rgb(255, 255, 255);
 	}
 
 	.comparison-cta.secondary {
 		background: transparent;
-		color: #6366f1;
-		border: 1px solid #6366f1;
+		color: var(--primary-color);
+		border: 1px solid var(--primary-color);
 	}
 
 	.comparison-category {

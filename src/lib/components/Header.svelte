@@ -6,9 +6,10 @@
 	let isMenuOpen = false;
 	let showDropdown = false;
 
-	// Closes the mobile menu when navigating
+	// Closes the mobile menu and dropdown when navigating
 	$: if ($page.url.pathname) {
 		isMenuOpen = false;
+		showDropdown = false;
 	}
 
 	function toggleMenu() {
@@ -22,15 +23,27 @@
 
 <header>
 	<nav class="container">
-		<a href="/" class="logo">
-			<span class="logo-icon">📄</span>
-			kostenlose-erechnung.de
-		</a>
-
-		{#if !$isLoading}
-			<div class="nav-links" class:open={isMenuOpen}>
+		<div class="nav-left">
+			<a href="/" class="logo">
+				<span class="logo-icon">📄</span>
+				kostenlose-erechnung.de
+			</a>
+			<div class="main-nav-links desktop-only">
+				<a
+					href="/preise"
+					class="nav-link"
+					class:active={$page.url.pathname === "/preise"}
+				>
+					Preise
+				</a>
+				<a
+					href="/auslesen"
+					class="nav-link"
+					class:active={$page.url.pathname.startsWith("/auslesen")}
+				>
+					Rechnung prüfen
+				</a>
 				{#if $isAuthenticated}
-					<!-- Logged-in Navigation -->
 					<a
 						href="/dashboard"
 						class="nav-link"
@@ -39,17 +52,27 @@
 						Dashboard
 					</a>
 				{/if}
+			</div>
+		</div>
 
-				<a
-					href="/auslesen"
-					class="nav-link"
-					class:active={$page.url.pathname === "/auslesen"}
-				>
-					Rechnung prüfen
-				</a>
+		<div class="nav-right-wrapper" class:open={isMenuOpen}>
+			{#if !$isAuthenticated && !$isLoading}
+				<div class="auth-links">
+					<a
+						href="/login"
+						class="nav-link"
+						class:active={$page.url.pathname === "/login"}
+					>
+						Einloggen
+					</a>
+					<a href="/erstellen" class="btn btn-primary nav-cta">
+						Rechnung erstellen →
+					</a>
+				</div>
+			{/if}
 
-				{#if $isAuthenticated && $authStore}
-					<!-- User Menu (for logged-in users) -->
+			{#if $isAuthenticated && $authStore && !$isLoading}
+				<div class="auth-links">
 					<div class="user-menu">
 						<button
 							class="user-button"
@@ -70,6 +93,9 @@
 								<a href="/dashboard/invoices" class="dropdown-item">
 									<span>📄</span> Meine Rechnungen
 								</a>
+								<a href="/erstellen" class="dropdown-item">
+									<span>➕</span> Neue Rechnung
+								</a>
 								<a href="/dashboard/settings" class="dropdown-item">
 									<span>⚙️</span> Einstellungen
 								</a>
@@ -85,25 +111,9 @@
 							</div>
 						{/if}
 					</div>
-
-					<a href="/erstellen" class="btn btn-primary nav-cta">
-						Neue Rechnung →
-					</a>
-				{:else}
-					<!-- Logged-out Navigation -->
-					<a
-						href="/login"
-						class="nav-link"
-						class:active={$page.url.pathname === "/login"}
-					>
-						Anmelden
-					</a>
-					<a href="/erstellen" class="btn btn-primary nav-cta">
-						Rechnung erstellen →
-					</a>
-				{/if}
-			</div>
-		{/if}
+				</div>
+			{/if}
+		</div>
 
 		<button
 			class="menu-toggle"
@@ -117,7 +127,8 @@
 </header>
 
 <style>
-	/* Your existing styles are great and have been preserved */
+	/* Deine existierenden Styles sind super und wurden beibehalten.
+       Hier sind nur die notwendigen Anpassungen und Ergänzungen. */
 	header {
 		background: var(--bg-white, #fff);
 		border-bottom: 1px solid var(--border-color, #dee2e6);
@@ -128,17 +139,36 @@
 		background: rgba(255, 255, 255, 0.95);
 	}
 
-	nav {
+	nav.container {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: space-between; /* WICHTIG: Teilt links und rechts */
 		height: 80px;
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 1rem;
 	}
 
+	.nav-left {
+		display: flex;
+		align-items: center;
+		gap: 2rem;
+	}
+
+	.main-nav-links {
+		display: flex;
+		align-items: center;
+		gap: 2rem;
+	}
+
+	.auth-links {
+		display: flex;
+		align-items: center;
+		gap: 1.5rem;
+	}
+
 	.logo {
+		/* ... existing styles ... */
 		font-size: 1.25rem;
 		font-weight: 700;
 		color: var(--text-dark, #1a1a1a);
@@ -147,20 +177,16 @@
 		gap: 0.5rem;
 		transition: transform 0.3s ease;
 		text-decoration: none;
+		flex-shrink: 0; /* Verhindert, dass das Logo schrumpft */
 	}
 
+	/* ... all your other great styles for .nav-link, .user-menu etc. remain the same ... */
 	.logo:hover {
 		transform: scale(1.05);
 	}
 
 	.logo-icon {
 		font-size: 1.5rem;
-	}
-
-	.nav-links {
-		display: flex;
-		align-items: center;
-		gap: 2rem;
 	}
 
 	.nav-link {
@@ -242,7 +268,7 @@
 		border: 1px solid var(--border-color, #dee2e6);
 		border-radius: var(--radius, 6px);
 		box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
-		min-width: 200px;
+		min-width: 220px;
 		z-index: 1000;
 		padding: 0.5rem 0;
 	}
@@ -305,7 +331,7 @@
 	}
 
 	.menu-toggle {
-		display: none;
+		display: none; /* Wird nur auf Mobilgeräten sichtbar */
 		background: none;
 		border: none;
 		cursor: pointer;
@@ -314,6 +340,7 @@
 	}
 
 	.hamburger {
+		/* ... existing styles ... */
 		display: block;
 		width: 24px;
 		height: 2px;
@@ -321,7 +348,6 @@
 		position: relative;
 		transition: all 0.3s ease;
 	}
-
 	.hamburger::before,
 	.hamburger::after {
 		content: "";
@@ -331,37 +357,37 @@
 		background: var(--text-dark, #1a1a1a);
 		transition: all 0.3s ease;
 	}
-
 	.hamburger::before {
 		top: -8px;
 	}
-
 	.hamburger::after {
 		top: 8px;
 	}
-
 	.hamburger.open {
 		background: transparent;
 	}
-
 	.hamburger.open::before {
 		transform: rotate(45deg);
 		top: 0;
 	}
-
 	.hamburger.open::after {
 		transform: rotate(-45deg);
 		top: 0;
 	}
 
+	/* --- Media Query für Mobile Ansicht --- */
 	@media (max-width: 980px) {
-		.menu-toggle {
-			display: block;
+		.desktop-only {
+			display: none; /* Hauptlinks im linken Bereich auf Mobil ausblenden */
 		}
 
-		.nav-links {
+		.menu-toggle {
+			display: block; /* Hamburger-Menü anzeigen */
+		}
+
+		.nav-right-wrapper {
 			position: fixed;
-			top: 80px; /* Height of the navbar */
+			top: 80px; /* Höhe der Navbar */
 			left: 0;
 			right: 0;
 			bottom: 0;
@@ -373,12 +399,23 @@
 			opacity: 0;
 			visibility: hidden;
 			transition: all 0.3s ease-in-out;
+
+			/* Stellt sicher, dass die Links im mobilen Menü korrekt ausgerichtet sind */
+			display: flex;
+			align-items: flex-start;
 		}
 
-		.nav-links.open {
+		.nav-right-wrapper.open {
 			transform: translateX(0);
 			opacity: 1;
 			visibility: visible;
+		}
+
+		.auth-links {
+			flex-direction: column;
+			width: 100%;
+			gap: 1.5rem;
+			align-items: stretch; /* Füllt die Breite aus */
 		}
 
 		.nav-cta {
@@ -402,6 +439,7 @@
 			border: none;
 			background: var(--bg-light, #f8f9fa);
 			margin-top: 1rem;
+			min-width: 100%;
 		}
 	}
 </style>

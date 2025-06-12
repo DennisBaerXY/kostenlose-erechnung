@@ -672,7 +672,7 @@
 	}
 
 	.input:focus {
-		border-color: #7bfe84;
+		border-color: var(--primary-color);
 		box-shadow: 0 0 0 3px rgba(123, 254, 132, 0.1);
 	}
 
@@ -717,7 +717,7 @@
 	}
 
 	.checkbox-label input {
-		accent-color: #7bfe84;
+		accent-color: var(--primary-color);
 		margin-top: 0.25rem;
 		flex-shrink: 0;
 	}
@@ -858,7 +858,7 @@
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
-		background: #7bfe84;
+		background: var(--primary-color);
 		animation: bounce 1.4s ease-in-out infinite both;
 	}
 
@@ -998,7 +998,7 @@
 	}
 
 	.pro-teaser:hover {
-		border-color: #7bfe84;
+		border-color: var(--primary-color);
 		transform: translateY(-2px);
 	}
 
@@ -1008,7 +1008,7 @@
 		color: #1a1a1a;
 		margin: 0 0 0.5rem 0;
 		text-decoration: underline;
-		text-decoration-color: #7bfe84;
+		text-decoration-color: var(--primary-color);
 		text-decoration-thickness: 3px;
 	}
 

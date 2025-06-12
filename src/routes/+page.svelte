@@ -193,7 +193,7 @@
 
 		<div class="steps-alternating">
 			{#each howItWorksSteps as step, i}
-				<div class="step-item">
+				<div class="step-item-hero">
 					<div class="step-text">
 						<span class="step-number">{step.number}</span>
 						<h3>{step.title}</h3>
@@ -557,7 +557,7 @@
 		); /* Größerer Abstand zwischen den vertikalen Schritten */
 	}
 
-	.step-item {
+	.step-item-hero {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: clamp(2rem, 5vw, 4rem);
@@ -565,10 +565,10 @@
 	}
 
 	/* Kehrt die Reihenfolge für jedes zweite Element um */
-	.step-item:nth-child(even) .step-text {
+	.step-item-hero:nth-child(even) .step-text {
 		order: 2;
 	}
-	.step-item:nth-child(even) .step-image {
+	.step-item-hero:nth-child(even) .step-image {
 		order: 1;
 	}
 
@@ -817,14 +817,14 @@
 			width: 100%;
 			justify-content: center;
 		}
-		.step-item {
+		.step-item-hero {
 			grid-template-columns: 1fr; /* Einzelne Spalte auf Mobilgeräten */
 			text-align: center;
 		}
 
 		/* Auf Mobilgeräten die Reihenfolge zurücksetzen und zentrieren */
-		.step-item:nth-child(even) .step-text,
-		.step-item:nth-child(even) .step-image {
+		.step-item-hero:nth-child(even) .step-text,
+		.step-item-hero-item:nth-child(even) .step-image {
 			order: initial;
 		}
 
