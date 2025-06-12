@@ -273,7 +273,7 @@
 									{:else if recentInvoices.length === 0}
 										<div class="empty-state">
 											<p>Noch keine Rechnungen erstellt</p>
-											<a href="/erstellen" class="btn btn-primary btn-small"
+											<a href="/erstellen" class="btn btn-primary"
 												>Erste Rechnung erstellen</a
 											>
 										</div>
@@ -331,7 +331,7 @@
 										<div class="empty-state">
 											<p>Noch keine Kunden gespeichert</p>
 											<button
-												class="btn btn-secondary btn-small"
+												class="btn btn-secondary"
 												on:click={() => (showCreateContactModal = true)}
 											>
 												Ersten Kunden anlegen
@@ -690,26 +690,21 @@
 
 	.stats-grid {
 		display: grid;
+		background: var(--bg-white, #fff);
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1.5rem;
 		margin-bottom: 3rem;
+
+		border-radius: var(--radius-lg, 12px);
+		border: 1px solid var(--border-color, #dee2e6);
 	}
 
 	.stat-card {
-		background: var(--bg-white, #fff);
 		padding: 1.5rem;
-		border-radius: var(--radius-lg, 12px);
-		border: 1px solid var(--border-color, #dee2e6);
+
 		display: flex;
 		align-items: center;
 		gap: 1.5rem;
-		transition: all 0.3s ease;
-	}
-
-	.stat-card:hover {
-		transform: translateY(-4px);
-		box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
-		border-color: var(--primary-color, #7bfe84);
 	}
 
 	.stat-icon {
