@@ -259,6 +259,42 @@ export const authStore = {
 		if (browser) {
 			window.location.href = "/login";
 		}
+	},
+
+	async forgotPassword(email) {
+		try {
+			const API_BASE_URL =
+				import.meta.env.VITE_API_URL || "https://your-api-gateway-url.com";
+
+			const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ email })
+			});
+
+			return await { ...(await response.json()), success: true };
+		} catch (error) {
+			console.error("Forgot password error:", error);
+			return { success: false, message: "Forgot password request failed" };
+		}
+	},
+
+	async resetPassword(email, code, newPassword) {
+		try {
+			const API_BASE_URL =
+				import.meta.env.VITE_API_URL || "https://your-api-gateway-url.com";
+
+			const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ email, code, newPassword })
+			});
+
+			return await { ...(await response.json()), success: true };
+		} catch (error) {
+			console.error("Reset password error:", error);
+			return { success: false, message: "Reset password request failed" };
+		}
 	}
 };
 

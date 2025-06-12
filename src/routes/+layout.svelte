@@ -36,8 +36,8 @@
 	}
 
 	:global(body) {
-		font-family:
-			-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+			sans-serif;
 		color: var(--text-dark);
 		line-height: 1.6;
 		background: var(--bg-white);

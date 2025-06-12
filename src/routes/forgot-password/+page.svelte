@@ -4,7 +4,9 @@
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { fade, fly } from "svelte/transition";
-	import { isAuthenticated } from "$lib/stores/auth.js";
+
+	import { isAuthenticated, authStore } from "$lib/stores/authStore";
+	import { auth } from "$lib/api/auth";
 
 	let email = "";
 	let loading = false;
@@ -32,13 +34,16 @@
 		error = "";
 
 		try {
-			// TODO: Implement forgot password API call
-			// const result = await authAPI.forgotPassword(email);
-
-			// Simulate API call for now
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			const result = await authStore.forgotPassword(email);
+			if (!result.success) {
+				error =
+					result.message ||
+					"Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
+				return;
+			}
 
 			success = true;
+
 			step = "code";
 		} catch (err) {
 			console.error("Forgot password error:", err);
@@ -70,9 +75,18 @@
 		try {
 			// TODO: Implement reset password API call
 			// const result = await authAPI.resetPassword(email, resetCode, newPassword);
+			const result = await authStore.resetPassword(
+				email,
+				resetCode,
+				newPassword
+			);
 
-			// Simulate API call for now
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			if (!result.success) {
+				error =
+					result.message ||
+					"Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
+				return;
+			}
 
 			success = true;
 			step = "complete";
@@ -183,6 +197,7 @@
 								on:input={clearError}
 								placeholder="ihre@email.de"
 								required
+								autofocus
 								autocomplete="email"
 								class="input"
 							/>
@@ -204,7 +219,6 @@
 
 					{#if success}
 						<div class="success-message" in:fly={{ y: 10, duration: 300 }}>
-							<span class="success-icon">✅</span>
 							<div>
 								<strong>E-Mail gesendet!</strong>
 								<p>Prüfen Sie Ihr Postfach und geben Sie den Code unten ein.</p>
@@ -239,7 +253,7 @@
 								required
 								class="input code-input"
 								maxlength="6"
-								pattern="[0-9]{6}"
+								pattern="[0-9]{'{'}6{'}'}"
 							/>
 							<small class="input-hint">6-stelliger Code aus der E-Mail</small>
 						</div>

@@ -105,24 +105,6 @@
 						Kunden anzulegen.
 					</p>
 				</div>
-				<div class="features-list">
-					<div class="feature-item">
-						<span class="feature-icon">✓</span>
-						<span>Unbegrenzte kostenlose E-Rechnungen</span>
-					</div>
-					<div class="feature-item">
-						<span class="feature-icon">✓</span>
-						<span>XRechnung & ZUGFeRD konform</span>
-					</div>
-					<div class="feature-item">
-						<span class="feature-icon">✓</span>
-						<span>Sichere Cloud-Speicherung</span>
-					</div>
-					<div class="feature-item">
-						<span class="feature-icon">✓</span>
-						<span>DSGVO-konform</span>
-					</div>
-				</div>
 			</div>
 		</div>
 
