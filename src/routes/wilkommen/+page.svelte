@@ -140,7 +140,7 @@
 		isSaving = true;
 		const result = await profileActions.saveSenderData(senderData);
 		if (result.success) {
-			goto("/erstellen");
+			goto("/dashboard");
 		} else {
 			alert("Fehler beim Speichern der Daten. Bitte versuchen Sie es erneut.");
 		}
