@@ -173,11 +173,6 @@
 		const { format } = event.detail;
 
 		// Check limits
-		const currentCount = getInvoiceCount();
-		if (currentCount >= 5 && $premiumState.userTier !== "premium") {
-			premiumActions.showPremiumUpgrade("Mehr als 5 Rechnungen pro Monat");
-			return;
-		}
 
 		if (!isFormValid) {
 			alert(
@@ -189,9 +184,8 @@
 
 		try {
 			uiActions.setDownloading(true);
-			await new Promise((resolve) => setTimeout(resolve, 500));
 
-			const result = downloadXRechnung($invoiceData, format);
+			const result = await downloadXRechnung($invoiceData);
 
 			if (result.success) {
 				incrementInvoiceCount();

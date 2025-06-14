@@ -252,6 +252,7 @@
 								placeholder="123456"
 								required
 								class="input code-input"
+								autocomplete="one-time-code"
 								maxlength="6"
 								pattern="[0-9]{'{'}6{'}'}"
 							/>

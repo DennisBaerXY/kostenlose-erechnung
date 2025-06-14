@@ -26,7 +26,7 @@ async function fetchWithAuth(endpoint, options = {}, isRetry = false) {
 	});
 
 	// Handle token expiration
-	if (response.status === 401 && !isRetry) {
+	if ((response.status === 401 || response.status === 403) && !isRetry) {
 		try {
 			console.log("Access token expired. Attempting to refresh...");
 
@@ -87,5 +87,27 @@ export const apiClient = {
 		const response = await fetchWithAuth(endpoint, { method: "DELETE" });
 		if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
 		return response.json();
+	},
+
+	/**
+	 * Uploads a file to a pre-signed S3 URL.
+	 * @param {string} url The pre-signed URL.
+	 * @param {File} file The file to upload.
+	 * @param {string} fileType The MIME type of the file.
+	 * @returns {Promise<Response>}
+	 */
+	async uploadFile(url, file, fileType) {
+		const response = await fetch(url, {
+			method: "PUT",
+			body: file,
+			headers: {
+				"Content-Type": fileType
+			}
+		});
+
+		if (!response.ok) {
+			throw new Error(`File upload failed: ${response.statusText}`);
+		}
+		return response;
 	}
 };

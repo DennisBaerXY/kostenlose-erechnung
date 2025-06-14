@@ -302,6 +302,10 @@ export const authStore = {
 export const isAuthenticated = derived(_user, ($user) => !!$user);
 export const currentUser = derived(_user, ($user) => $user);
 export const authTokens = derived(_tokens, ($tokens) => $tokens);
+export const isPremiumUser = derived(
+	_user,
+	($user) => $user?.isPremium || false
+);
 
 // --- Legacy Functions (for backward compatibility) ---
 export async function signUpUser(email, password) {

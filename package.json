@@ -22,6 +22,8 @@
 	"dependencies": {
 		"chart.js": "^4.4.9",
 		"jspdf": "^3.0.1",
+		"jspdf-autotable": "^5.0.2",
+		"pdf-lib": "^1.17.1",
 		"xml2js": "^0.6.2"
 	}
 }

@@ -35,7 +35,7 @@
 				subtitle: "Für kleine Unternehmen",
 				badge: "Empfohlen",
 				price: { monthly: 14.99, yearly: 149 },
-				originalPrice: { monthly: 29.99, yearly: 299 },
+
 				savings: "17% gespart",
 				popular: true,
 				description:
@@ -58,7 +58,7 @@
 				subtitle: "Für Selbstständige",
 				badge: null,
 				price: { monthly: 9.99, yearly: 99 },
-				originalPrice: { monthly: 12.99, yearly: 129 },
+
 				savings: "17% gespart",
 				popular: false,
 				description:
@@ -340,7 +340,7 @@
 									<span class="price-period"> pro Monat (zzgl. MwSt.) </span>
 									<span class="price-note">
 										{selectedPeriod === "yearly"
-											? "Abrechnung erfolgt alle zwei Jahre."
+											? "Abrechnung erfolgt Jährlich."
 											: "Abrechnung erfolgt monatlich."}
 									</span>
 								{/if}

@@ -1,4 +1,8 @@
 // src/lib/stores/invoice.js (REVERTED - NO RUNES)
+import {
+	generateInvoice,
+	generateXRechnungCII
+} from "$lib/utils/invoice-generator";
 import { writable, derived } from "svelte/store";
 
 const initialData = {
@@ -10,7 +14,7 @@ const initialData = {
 		city: "Musterstadt",
 		phone: "+49 6151 123456",
 		email: "info@musterfirma.de",
-		taxId: "DE123456789",
+		taxId: "12/345/67890",
 		ustId: "DE123456789",
 		logo: null,
 		bankDetails: {
@@ -72,6 +76,77 @@ const initialData = {
 
 // Main invoice store
 export const invoiceData = writable(JSON.parse(JSON.stringify(initialData)));
+
+/**
+ * Saves the current invoice data to the backend, including uploading generated files.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function saveInvoice() {
+	const data = get(invoiceData);
+	const invoiceId = crypto.randomUUID(); // Generate a unique ID for the invoice
+
+	try {
+		// 1. Generate Files
+		const xmlString = generateXRechnungCII(data);
+
+		const xmlBlob = new Blob([xmlString], { type: "application/xml" });
+		const pdfBlob = await generateInvoice(data, "ZUGFeRD");
+
+		// 2. Upload Files to S3
+		const pdfS3Key = `invoices/${invoiceId}/rechnung-${invoiceId}.pdf`;
+		const xmlS3Key = `invoices/${invoiceId}/rechnung-${invoiceId}.xml`;
+
+		await uploadFile(pdfS3Key, "application/pdf", pdfBlob);
+		await uploadFile(xmlS3Key, "application/xml", xmlBlob);
+
+		// 3. Save Invoice Metadata to DB
+		const payload = {
+			...data,
+			invoiceId,
+			files: {
+				pdf_s3_key: pdfS3Key,
+				xml_s3_key: xmlS3Key
+			}
+		};
+
+		const result = await invoiceApi.createInvoice(payload);
+		if (!result.success) {
+			throw new Error(result.message || "Failed to save invoice metadata.");
+		}
+
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to save invoice:", error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Helper function to upload a file to S3 via a pre-signed URL.
+ * @param {string} key - The S3 key for the file.
+ * @param {string} type - The MIME type of the file.
+ * @param {Blob} blob - The file content as a Blob.
+ */
+async function uploadFile(key, type, blob) {
+	// Get a pre-signed URL from our backend
+	const { success, url } = await invoiceApi.getUploadUrl(key, type);
+	if (!success) {
+		throw new Error(`Could not get an upload URL for ${key}`);
+	}
+
+	// Upload the file to S3
+	const uploadResponse = await fetch(url, {
+		method: "PUT",
+		headers: {
+			"Content-Type": type
+		},
+		body: blob
+	});
+
+	if (!uploadResponse.ok) {
+		throw new Error(`S3 upload failed for ${key}`);
+	}
+}
 
 // Derived calculations
 export const subtotal = derived(invoiceData, ($data) =>

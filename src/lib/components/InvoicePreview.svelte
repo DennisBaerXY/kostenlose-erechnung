@@ -1,175 +1,186 @@
-<!-- src/lib/components/InvoicePreview.svelte (ENHANCED) -->
-<script>
-	export let data;
+<script lang="ts">
+	import type { Invoice, InvoiceItem } from "$lib/types/invoice";
 
-	// Hilfsfunktionen
-	function formatDate(dateString) {
+	export let data: Invoice;
+
+	// --- Hilfsfunktionen, identisch zum PDF-Generator für Konsistenz ---
+	function formatDateDE(dateString?: string): string {
 		if (!dateString) return "";
-		return new Date(dateString + "T00:00:00").toLocaleDateString("de-DE");
+		const [year, month, day] = dateString.split("T")[0].split("-");
+		return `${day}.${month}.${year}`;
 	}
 
-	function formatCurrency(amount) {
+	function formatCurrency(amount: number): string {
 		if (isNaN(amount)) return "0,00 €";
-		return amount.toFixed(2).replace(".", ",") + " €";
+		return new Intl.NumberFormat("de-DE", {
+			style: "currency",
+			currency: "EUR"
+		}).format(amount);
 	}
 
-	// Berechnete Werte
+	function getPaymentTermsText(metadata: any): string {
+		if (metadata.customPaymentTerms) return metadata.customPaymentTerms;
+		const days =
+			{ net14: 14, net30: 30, immediate: 0 }[metadata.paymentTerms] ?? 30;
+		if (days === 0) return "Zahlbar sofort ohne Abzug.";
+		const dueDate = new Date(metadata.date);
+		dueDate.setDate(dueDate.getDate() + days);
+		return `Zahlbar ohne Abzug bis zum ${formatDateDE(dueDate.toISOString())}.`;
+	}
+
+	// --- Berechnete Werte ---
 	$: items = data.items || [];
-	$: subtotal = items.reduce(
-		(sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
-		0
-	);
+	$: isKleinunternehmer = data.metadata.taxType === "KLEINUNTERNEHMER";
 
-	$: taxGroups = items.reduce((groups, item) => {
-		const rate = item.taxRate || 19;
-		if (!groups[rate]) {
-			groups[rate] = { rate, base: 0, tax: 0 };
+	$: totals = (() => {
+		const subtotal = items.reduce(
+			(sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
+			0
+		);
+		if (isKleinunternehmer) {
+			return { subtotal, taxAmount: 0, total: subtotal, taxGroups: {} };
 		}
-		const itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-		groups[rate].base += itemTotal;
-		groups[rate].tax += (itemTotal * rate) / 100;
-		return groups;
-	}, {});
+		const taxGroups = items.reduce(
+			(groups, item) => {
+				const rate = item.taxRate || 19;
+				if (!groups[rate]) groups[rate] = { rate, base: 0, tax: 0 };
+				const itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+				groups[rate].base += itemTotal;
+				groups[rate].tax += (itemTotal * rate) / 100;
+				return groups;
+			},
+			{} as { [key: number]: { rate: number; base: number; tax: number } }
+		);
+		const taxAmount = Object.values(taxGroups).reduce(
+			(sum, group) => sum + group.tax,
+			0
+		);
+		const total = subtotal + taxAmount;
+		return { subtotal, taxGroups, taxAmount, total };
+	})();
 
-	$: taxAmount = Object.values(taxGroups).reduce(
-		(sum, group) => sum + group.tax,
-		0
-	);
-	$: total = subtotal + taxAmount;
+	// --- Paginierungslogik ---
+	const ITEMS_PER_FIRST_PAGE = 8;
+	const ITEMS_PER_SUBSEQUENT_PAGE = 20;
+	let paginatedItems: InvoiceItem[][] = [];
 
-	// Paginierung für Items
-	const ITEMS_PER_PAGE = 15; // Ungefähr 15 Positionen passen auf eine A4-Seite
-	$: itemPages = [];
 	$: {
-		itemPages = [];
-		for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
-			itemPages.push(items.slice(i, i + ITEMS_PER_PAGE));
-		}
-		if (itemPages.length === 0) {
-			itemPages = [[]]; // Mindestens eine leere Seite
+		paginatedItems = [];
+		if (items.length > 0) {
+			let currentItemIndex = 0;
+			// Erste Seite
+			const firstPageCount = Math.min(items.length, ITEMS_PER_FIRST_PAGE);
+			paginatedItems.push(items.slice(currentItemIndex, firstPageCount));
+			currentItemIndex += firstPageCount;
+
+			// Folgeseiten
+			while (currentItemIndex < items.length) {
+				const nextPageCount = Math.min(
+					items.length - currentItemIndex,
+					ITEMS_PER_SUBSEQUENT_PAGE
+				);
+				paginatedItems.push(
+					items.slice(currentItemIndex, currentItemIndex + nextPageCount)
+				);
+				currentItemIndex += nextPageCount;
+			}
+		} else {
+			paginatedItems = [[]]; // Immer mindestens eine Seite anzeigen
 		}
 	}
 </script>
 
 <div class="invoice-container">
-	{#each itemPages as pageItems, pageIndex}
+	{#each paginatedItems as pageItems, pageIndex}
 		<div class="invoice-page" class:page-break={pageIndex > 0}>
-			<!-- Header - auf jeder Seite -->
+			<!-- ================= 1. HEADER (auf jeder Seite) ================= -->
 			<header class="page-header">
-				{#if data.sender.logo}
-					<div class="logo-section">
-						<img src={data.sender.logo} alt="Firmenlogo" class="company-logo" />
-					</div>
+				{#if data.sender?.logo}
+					<img src={data.sender.logo} alt="Firmenlogo" class="company-logo" />
 				{/if}
-
-				{#if pageIndex > 0}
-					<div class="page-number">Seite {pageIndex + 1}</div>
-				{/if}
+				<div class="sender-short-info">
+					{data.sender?.name} • {data.sender?.street} • {data.sender?.zip}
+					{data.sender?.city}
+				</div>
 			</header>
 
+			<!-- ================= 2. CONTENT ================= -->
 			<main class="page-content">
 				{#if pageIndex === 0}
-					<!-- Erste Seite: Vollständige Rechnungsinformationen -->
-					<section class="address-block">
-						<div class="recipient-address">
-							<div class="address-window">
-								<div class="sender-small">
-									{data.sender.name || "Absender"} · {data.sender.street || ""} ·
-									{data.sender.zip || ""}
-									{data.sender.city || ""}
-								</div>
-								<div class="recipient-main">
-									{#if data.recipient.companyName || data.recipient.name}
-										<div class="company-name">
-											{data.recipient.companyName || data.recipient.name}
-										</div>
-									{/if}
-									{#if data.recipient.department}
-										<div>{data.recipient.department}</div>
-									{/if}
-									{#if data.recipient.contactPerson}
-										<div>{data.recipient.contactPerson}</div>
-									{/if}
-									<div>{data.recipient.street || "Straße des Empfängers"}</div>
-									<div>
-										{data.recipient.zip || "PLZ"}
-										{data.recipient.city || "Stadt"}
-									</div>
-								</div>
+					<!-- Nur auf der ersten Seite -->
+					<section class="address-and-meta">
+						<div class="address-block">
+							<div class="sender-small">
+								{data.sender?.name} • {data.sender?.street} • {data.sender?.zip}
+								{data.sender?.city}
+							</div>
+							<div class="recipient-main">
+								{#if data.recipient?.name}
+									<div><strong>{data.recipient.name}</strong></div>
+								{/if}
+								{#if data.recipient?.street}
+									<div>{data.recipient.street}</div>
+								{/if}
+								{#if data.recipient?.zip || data.recipient?.city}
+									<div>{data.recipient.zip} {data.recipient.city}</div>
+								{/if}
 							</div>
 						</div>
-
-						<div class="sender-details">
-							<strong>{data.sender.name || "Ihre Firma"}</strong><br />
-
-							{data.sender.street || "Ihre Straße"}<br />
-							{data.sender.zip || "Ihre PLZ"}
-							{data.sender.city || "Ihre Stadt"}<br />
-							{#if data.sender.phone}Tel.: {data.sender.phone}<br />{/if}
-							{#if data.sender.email}{data.sender.email}{/if}
+						<div class="meta-block">
+							<strong>Rechnungs-Nr.:</strong>
+							{data.metadata?.invoiceNumber}<br />
+							<strong>Datum:</strong>
+							{formatDateDE(data.metadata?.date)}<br />
+							{#if data.metadata?.deliveryDate}
+								<strong>Lieferdatum:</strong>
+								{formatDateDE(data.metadata.deliveryDate)}<br />
+							{/if}
+							{#if data.recipient?.reference}
+								<strong>Ihre Referenz:</strong> {data.recipient.reference}<br />
+							{/if}
 						</div>
-					</section>
-
-					<section class="invoice-meta-block">
-						<strong>Rechnungs-Nr.:</strong>
-						{data.metadata.invoiceNumber || "RE-00001"}<br />
-						<strong>Datum:</strong>
-						{formatDate(data.metadata.date)}<br />
-						{#if data.metadata.deliveryDate}
-							<strong>Lieferdatum:</strong>
-							{formatDate(data.metadata.deliveryDate)} <br />
-						{/if}
-						{#if data.recipient.customerNumber}
-							<strong>Kunden-Nr.:</strong> {data.recipient.customerNumber}<br />
-						{/if}
-						{#if data.recipient.reference}
-							<strong>Referenz:</strong> {data.recipient.reference}<br />
-						{/if}
 					</section>
 
 					<h1 class="document-title">
-						{data.metadata.documentTitle || "Rechnung"}
+						{data.metadata?.documentTitle || "Rechnung"}
 					</h1>
 
-					{#if data.metadata.introductionText}
+					{#if data.metadata?.introductionText}
 						<p class="introduction-text">{data.metadata.introductionText}</p>
 					{/if}
 				{:else}
-					<!-- Folgeseiten: Vereinfachter Header -->
+					<!-- Header für Folgeseiten -->
 					<div class="continuation-header">
-						<h2>
-							Rechnung {data.metadata.invoiceNumber || "RE-00001"} (Fortsetzung)
-						</h2>
+						Seite {pageIndex + 1} zur Rechnung Nr. {data.metadata
+							?.invoiceNumber}
 					</div>
 				{/if}
 
-				<!-- Tabelle für aktuelle Seite -->
+				<!-- Positionstabelle -->
 				<div class="table-container">
 					<table class="items-table">
 						<thead>
 							<tr>
 								<th class="pos">Pos.</th>
-								<th class="description">Bezeichnung</th>
-								<th class="quantity">Menge</th>
+								<th class="desc">Bezeichnung</th>
+								<th class="qty">Menge</th>
 								<th class="unit">Einheit</th>
 								<th class="price">Einzelpreis</th>
-								<th class="total">Gesamtpreis</th>
+								<th class="total">Gesamt</th>
 							</tr>
 						</thead>
 						<tbody>
-							{#each pageItems as item, index}
+							{#each pageItems as item, itemIndex}
+								{@const globalIndex =
+									(pageIndex === 0 ? 0 : ITEMS_PER_FIRST_PAGE) +
+									(pageIndex > 1
+										? (pageIndex - 1) * ITEMS_PER_SUBSEQUENT_PAGE
+										: 0) +
+									itemIndex}
 								<tr>
-									<td class="pos">{pageIndex * ITEMS_PER_PAGE + index + 1}</td>
-									<td class="description">
-										<strong>{item.description || "Artikelbeschreibung"}</strong>
-										{#if item.articleNumber}<br /><small
-												>Art.-Nr.: {item.articleNumber}</small
-											>{/if}
-										{#if item.longDescription}
-											<div class="long-desc">{item.longDescription}</div>
-										{/if}
-									</td>
-									<td class="quantity">{item.quantity}</td>
+									<td class="pos">{globalIndex + 1}</td>
+									<td class="desc">{item.description}</td>
+									<td class="qty">{item.quantity}</td>
 									<td class="unit">{item.unit}</td>
 									<td class="price">{formatCurrency(item.unitPrice)}</td>
 									<td class="total"
@@ -177,70 +188,80 @@
 									>
 								</tr>
 							{/each}
-
-							<!-- Fülle leere Zeilen für konsistente Seitenhöhe auf der letzten Seite -->
 						</tbody>
 					</table>
 				</div>
 
-				{#if pageIndex === itemPages.length - 1}
-					<!-- Summen nur auf der letzten Seite -->
-					<div class="invoice-totals">
-						<div class="totals-content">
-							<div class="total-line">
-								<span>Nettosumme</span>
-								<span>{formatCurrency(subtotal)}</span>
-							</div>
-							{#each Object.values(taxGroups) as group}
+				<!-- Nur auf der letzten Seite -->
+				{#if pageIndex === paginatedItems.length - 1}
+					<section class="summary-section">
+						<!-- Totals Block -->
+						<div class="totals-block">
+							{#if isKleinunternehmer}
 								<div class="total-line">
-									<span>zzgl. {group.rate}% MwSt.</span>
-									<span>{formatCurrency(group.tax)}</span>
+									<span>Gesamtbetrag</span>
+									<span class="grand-total-value"
+										>{formatCurrency(totals.total)}</span
+									>
 								</div>
-							{/each}
-							<div class="total-line grand-total">
-								<span>Rechnungsbetrag</span>
-								<span>{formatCurrency(total)}</span>
-							</div>
+								<p class="kleinunternehmer-text">
+									Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.
+								</p>
+							{:else}
+								<div class="total-line">
+									<span>Zwischensumme</span>
+									<span>{formatCurrency(totals.subtotal)}</span>
+								</div>
+								{#each Object.values(totals.taxGroups) as group}
+									<div class="total-line">
+										<span>+ {group.rate}% MwSt.</span>
+										<span>{formatCurrency(group.tax)}</span>
+									</div>
+								{/each}
+								<div class="total-line grand-total">
+									<span>Gesamtbetrag</span>
+									<span class="grand-total-value"
+										>{formatCurrency(totals.total)}</span
+									>
+								</div>
+							{/if}
 						</div>
-					</div>
+					</section>
 
-					<div class="closing-text">
-						<p>
-							{data.metadata.customPaymentTerms ||
-								"Zahlbar innerhalb 30 Tagen ohne Abzug."}
-						</p>
-					</div>
-
-					{#if data.metadata.closingText}
-						<div class="closing-text">
+					<section class="closing-section">
+						{#if data.metadata?.closingText}
 							<p>{data.metadata.closingText}</p>
-						</div>
-					{/if}
+						{/if}
+						<p><strong>{getPaymentTermsText(data.metadata)}</strong></p>
+					</section>
 				{/if}
 			</main>
 
-			<!-- Footer - auf jeder Seite -->
+			<!-- ================= 3. FOOTER (auf jeder Seite) ================= -->
 			<footer class="page-footer">
 				<div class="footer-column">
-					<strong>Bankverbindung</strong><br />
-					{data.sender.bankDetails?.bankName || "Name der Bank"}<br />
-					IBAN: {data.sender.bankDetails?.iban || "-"}<br />
-					BIC: {data.sender.bankDetails?.bic || "-"}
+					<strong>{data.sender?.name}</strong><br />
+					{data.sender?.street}<br />
+					{data.sender?.zip}
+					{data.sender?.city}<br />
 				</div>
 				<div class="footer-column">
-					<strong>Firma & Register</strong><br />
-					{#if data.sender.companyInfo?.managingDirector}
-						Geschäftsführer: {data.sender.companyInfo.managingDirector}<br />
-					{/if}
-					{#if data.sender.companyInfo?.commercialRegister}
-						{data.sender.companyInfo.commercialRegister}<br />
-						Registergericht: {data.sender.companyInfo.registerCourt}
-					{/if}
+					<strong>Bankverbindung</strong><br />
+					{data.sender?.bankDetails?.bankName}<br />
+					IBAN: {data.sender?.bankDetails?.iban}<br />
+					BIC: {data.sender?.bankDetails?.bic}<br />
 				</div>
 				<div class="footer-column">
 					<strong>Kontakt & Steuern</strong><br />
-					St-Nr.: {data.sender.taxId || "-"}<br />
-					USt-IdNr.: {data.sender.ustId || "-"}
+					{#if data.sender?.companyInfo?.managingDirector}
+						GF: {data.sender.companyInfo.managingDirector}<br />
+					{/if}
+					{#if data.sender?.companyInfo?.commercialRegister}
+						{data.sender.companyInfo.registerCourt}, {data.sender.companyInfo
+							.commercialRegister}<br />
+					{/if}
+					St-Nr: {data.sender?.taxId}<br />
+					USt-IdNr: {data.sender?.ustId || "-"}
 				</div>
 			</footer>
 		</div>
@@ -248,371 +269,220 @@
 </div>
 
 <style>
-	/* A4-Format Container */
+	:root {
+		--font-family: "Helvetica", "Arial", sans-serif;
+		--font-size: 9pt;
+		--line-height: 1.4;
+		--page-width: 210mm;
+		--page-height: 297mm;
+		--margin-left: 20mm;
+		--margin-right: 20mm;
+		--margin-top: 15mm;
+		--margin-bottom: 10mm;
+		--text-color: #333;
+		--border-color: #e0e0e0;
+	}
+
 	.invoice-container {
-		background: #f5f5f5;
-		padding: 20px;
-		min-height: 100vh;
+		background: #e9e9e9;
+		padding: 2rem;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 20px;
+		gap: 2rem;
 	}
 
-	/* Einzelne A4-Seite */
 	.invoice-page {
 		background: white;
-		width: 210mm;
-		min-height: 297mm;
-		max-height: 297mm;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-		font-size: 10pt;
-		line-height: 1.4;
-		color: #333;
+		width: var(--page-width);
+		height: var(--page-height);
+		box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+		font-family: var(--font-family);
+		font-size: var(--font-size);
+		line-height: var(--line-height);
+		color: var(--text-color);
 		display: flex;
 		flex-direction: column;
 		position: relative;
-		overflow: hidden;
 	}
 
-	.page-break {
-		margin-top: 20px;
-	}
-
-	/* Header-Bereich */
+	/* --- HEADER & FOOTER --- */
 	.page-header {
-		padding: 15mm 20mm 5mm;
-
-		min-height: 25mm;
-		max-height: 25mm;
+		padding: var(--margin-top) var(--margin-right) 0 var(--margin-left);
+		height: 40mm;
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
 	}
-
-	.logo-section {
+	.company-logo {
+		max-height: 20mm;
+		max-width: 70mm;
+	}
+	.sender-short-info {
+		font-size: 8pt;
+		color: #888;
+		text-align: right;
+	}
+	.page-footer {
+		padding: 0 var(--margin-right) var(--margin-bottom) var(--margin-left);
+		height: 35mm;
+		border-top: 1px solid var(--border-color);
+		font-size: 8pt;
+		color: #666;
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		align-items: flex-start;
+		margin-top: auto;
+		padding-top: 5mm;
+	}
+	.footer-column {
 		flex: 1;
 	}
 
-	.company-logo {
-		max-height: 20mm;
-		max-width: 80mm;
-		object-fit: contain;
-	}
-
-	.sender-letterhead {
-		font-size: 8pt;
-		color: #888;
-		text-align: center;
-		padding-top: 5mm;
-	}
-
-	.page-number {
-		font-size: 9pt;
-		color: #666;
-		font-weight: 500;
-	}
-
-	/* Content-Bereich */
+	/* --- CONTENT --- */
 	.page-content {
-		padding: 5mm 20mm;
+		padding: 0 var(--margin-left);
 		flex-grow: 1;
 		display: flex;
 		flex-direction: column;
 	}
-
-	/* Adressen-Block (nur erste Seite) */
-	.address-block {
+	.address-and-meta {
 		display: flex;
 		justify-content: space-between;
-		margin-bottom: 10mm;
-		min-height: 35mm;
+		margin-top: 10mm;
+		margin-bottom: 15mm;
 	}
-
-	.recipient-address {
-		width: 85mm;
+	.address-block {
+		font-size: 10pt;
 	}
-
-	.address-window {
-		padding: 5mm;
-		min-height: 25mm;
-	}
-
 	.sender-small {
 		font-size: 7pt;
-		color: #666;
-		border-bottom: 1px solid #ddd;
+		border-bottom: 1px solid var(--border-color);
 		padding-bottom: 2mm;
 		margin-bottom: 3mm;
 	}
-
 	.recipient-main {
 		line-height: 1.5;
 	}
-
-	.company-name {
-		font-weight: bold;
-		font-size: 11pt;
-	}
-
-	.sender-details {
+	.meta-block {
 		text-align: right;
-		font-size: 9pt;
-		width: 60mm;
-	}
-
-	/* Meta-Informationen */
-	.invoice-meta-block {
-		width: 100%;
-
-		text-align: right;
-		margin-bottom: 10mm;
 		line-height: 1.6;
 	}
-
-	.continuation-header {
-		margin-bottom: 5mm;
-		padding-bottom: 3mm;
-		border-bottom: 1px solid #ddd;
-	}
-
-	.continuation-header h2 {
-		font-size: 14pt;
-		margin: 0;
-		color: #666;
-	}
-
-	/* Dokumenttitel */
 	.document-title {
 		font-size: 18pt;
 		font-weight: bold;
+		margin-bottom: 8mm;
+		border-bottom: 2px solid var(--border-color);
+		padding-bottom: 3mm;
+	}
+	.continuation-header {
+		font-size: 10pt;
+		color: #888;
+		padding-bottom: 5mm;
+		border-bottom: 1px solid #e0e0e0;
 		margin-bottom: 5mm;
 	}
 
-	.introduction-text {
-		margin-bottom: 8mm;
-		color: #666;
-	}
-
-	/* Tabellen-Container */
+	/* --- TABLE --- */
 	.table-container {
 		flex-grow: 1;
-		margin-bottom: 5mm;
 	}
-
-	/* Tabellen-Styling */
 	.items-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 9pt;
 	}
-
 	.items-table th {
 		text-align: left;
-		padding: 6px 4px;
-		background: #f8f8f8;
-		border-bottom: 2px solid #ddd;
+		padding: 8px 4px;
+		border-bottom: 2px solid #333;
 		font-weight: bold;
 		font-size: 8pt;
+		text-transform: uppercase;
 	}
-
 	.items-table td {
-		padding: 6px 4px;
-		border-bottom: 1px solid #eee;
+		padding: 8px 4px;
+		border-bottom: 1px solid var(--border-color);
 		vertical-align: top;
 	}
-
 	.items-table th.pos,
 	.items-table td.pos {
 		text-align: center;
-		width: 8mm;
+		width: 8%;
 	}
-
-	.items-table th.description,
-	.items-table td.description {
-		width: auto;
-		min-width: 60mm;
+	.items-table th.desc,
+	.items-table td.desc {
+		width: 42%;
 	}
-
-	.items-table th.quantity,
-	.items-table td.quantity,
+	.items-table th.qty,
+	.items-table td.qty {
+		text-align: right;
+		width: 10%;
+	}
 	.items-table th.unit,
 	.items-table td.unit {
-		text-align: center;
-		width: 15mm;
+		text-align: left;
+		width: 15%;
 	}
-
 	.items-table th.price,
-	.items-table td.price,
+	.items-table td.price {
+		text-align: right;
+		width: 15%;
+	}
 	.items-table th.total,
 	.items-table td.total {
 		text-align: right;
-		width: 20mm;
+		width: 15%;
 	}
 
-	.empty-row td {
-		height: 8mm;
-		border-bottom: none;
-	}
-
-	.long-desc {
-		font-size: 8pt;
-		color: #666;
-		margin-top: 2mm;
-		white-space: pre-wrap;
-	}
-
-	/* Summen-Bereich */
-	.invoice-totals {
+	/* --- TOTALS & CLOSING --- */
+	.summary-section {
 		display: flex;
 		justify-content: flex-end;
-		margin: 5mm 0;
+		margin-top: 5mm;
 	}
-
-	.totals-content {
-		width: 60mm;
-		border-top: 1px solid #ddd;
-		padding-top: 3mm;
+	.totals-block {
+		width: 45%;
 	}
-
 	.total-line {
 		display: flex;
 		justify-content: space-between;
-		padding: 2mm 0;
-		border-bottom: 1px solid #eee;
+		padding: 4px 0;
 	}
-
-	.total-line.grand-total {
+	.grand-total {
+		font-weight: bold;
+		font-size: 11pt;
 		border-top: 2px solid #333;
 		border-bottom: 2px solid #333;
-		margin-top: 3mm;
-		padding-top: 3mm;
-		font-size: 11pt;
-		font-weight: bold;
+		margin-top: 5px;
+		padding: 5px 0;
 	}
-
-	.closing-text {
-		margin-top: 5mm;
+	.kleinunternehmer-text {
+		font-size: 8pt;
 		color: #666;
+		margin-top: 5mm;
+	}
+	.closing-section {
+		margin-top: 10mm;
+		padding-top: 5mm;
+		border-top: 1px solid var(--border-color);
 	}
 
-	.closing-text p {
-		white-space: pre-wrap;
-		margin: 0;
-	}
-
-	/* Footer */
-	.page-footer {
-		padding: 5mm 20mm 10mm;
-		border-top: 1px solid #ccc;
-		font-size: 7pt;
-		color: #555;
-		display: flex;
-		justify-content: space-between;
-		gap: 15mm;
-		margin-top: auto;
-	}
-
-	.footer-column {
-		flex: 1;
-		line-height: 1.5;
-	}
-
-	/* Print-Styles */
+	/* --- PRINT STYLES --- */
 	@media print {
-		.invoice-container {
-			background: white;
-			padding: 0;
+		body {
+			background: white !important;
 		}
-
+		.invoice-container {
+			padding: 0;
+			background: white;
+		}
 		.invoice-page {
 			box-shadow: none;
 			margin: 0;
 			page-break-after: always;
-			width: 100%;
-			min-height: 100vh;
-			max-height: none;
 		}
-
-		.page-break {
-			margin-top: 0;
-		}
-
 		.invoice-page:last-child {
 			page-break-after: auto;
-		}
-
-		/* Vermeide Seitenumbrüche in kritischen Bereichen */
-		.address-block,
-		.invoice-meta-block,
-		.document-title,
-		.invoice-totals {
-			page-break-inside: avoid;
-		}
-
-		.items-table {
-			page-break-inside: auto;
-		}
-
-		.items-table thead {
-			display: table-header-group;
-		}
-
-		.items-table tr {
-			page-break-inside: avoid;
-		}
-	}
-
-	/* Responsive Anpassungen */
-	@media (max-width: 768px) {
-		.invoice-container {
-			padding: 10px;
-		}
-
-		.invoice-page {
-			width: 100%;
-			min-height: auto;
-			max-height: none;
-		}
-
-		.page-header {
-			padding: 10mm 15mm 5mm;
-		}
-
-		.page-content {
-			padding: 5mm 15mm;
-		}
-
-		.page-footer {
-			padding: 5mm 15mm 10mm;
-			flex-direction: column;
-			gap: 5mm;
-		}
-
-		.address-block {
-			flex-direction: column;
-			gap: 5mm;
-		}
-
-		.sender-details {
-			text-align: left;
-			width: auto;
-		}
-
-		.items-table {
-			font-size: 8pt;
-		}
-
-		.items-table th,
-		.items-table td {
-			padding: 4px 2px;
-		}
-	}
-
-	/* Hochauflösende Displays */
-	@media (min-resolution: 192dpi) {
-		.company-logo {
-			image-rendering: crisp-edges;
 		}
 	}
 </style>

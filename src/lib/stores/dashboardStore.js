@@ -1,5 +1,6 @@
 import { writable, get } from "svelte/store";
 import { dashboardApi } from "$lib/api/dashboard";
+import { invoiceApi } from "$lib/api/invoice.js";
 
 // --- Writable Stores for State Management ---
 
@@ -28,9 +29,10 @@ export const dashboardActions = {
 		dashboardError.set(null);
 		try {
 			// Fetch stats and contacts in parallel for better performance
-			const [statsData, contactsData] = await Promise.all([
+			const [statsData, contactsData, invoicesData] = await Promise.all([
 				dashboardApi.getStats(),
-				dashboardApi.getContacts()
+				dashboardApi.getContacts(),
+				invoiceApi.getInvoices() // Fetch invoices
 			]);
 
 			// Update the stats store
@@ -45,19 +47,41 @@ export const dashboardActions = {
 
 			// Update the contacts store
 			contacts.set(contactsData.contacts || []);
-
-			// Derive recent contacts from the full list
-			const sortedContacts = [...contactsData.contacts].sort(
+			const sortedContacts = [...(contactsData.contacts || [])].sort(
 				(a, b) => new Date(b.createdAt) - new Date(a.createdAt)
 			);
 			recentContacts.set(sortedContacts.slice(0, 3));
+
+			// Update the invoices store
+			invoices.set(invoicesData.invoices || []);
 		} catch (err) {
 			console.error("Dashboard initialization failed:", err);
 			dashboardError.set(err.message || "Failed to load dashboard data.");
 		} finally {
-			// Print dashboardstats
-
 			dashboardLoading.set(false);
+		}
+	},
+
+	/**
+	 * Handles the download of an invoice file.
+	 * @param {string} invoiceId
+	 * @param {'pdf' | 'xml'} format
+	 */
+	async downloadInvoice(invoiceId, format) {
+		try {
+			const result = await invoiceApi.getDownloadUrl(invoiceId, format);
+			if (result.success && result.downloadUrl) {
+				// Open the secure link in a new tab to trigger download
+				window.open(result.downloadUrl, "_blank");
+			} else {
+				throw new Error("Could not retrieve download link.");
+			}
+		} catch (err) {
+			console.error(
+				`Failed to download ${format} for invoice ${invoiceId}:`,
+				err
+			);
+			// Optionally: show an error message to the user
 		}
 	},
 

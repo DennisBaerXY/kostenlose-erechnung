@@ -48,6 +48,7 @@ export const canGoPrev = derived(
 // Navigation actions
 export const wizardActions = {
 	nextStep() {
+		window.scrollTo({ top: 0, behavior: "smooth" });
 		currentStep.update((step) => Math.min(step + 1, totalSteps));
 	},
 
